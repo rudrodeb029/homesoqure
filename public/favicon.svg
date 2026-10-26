@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3d2a20" />
+      <stop offset="100%" stop-color="#241712" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e2ba7d" />
+      <stop offset="100%" stop-color="#b88b4a" />
+    </linearGradient>
+  </defs>
+  <!-- Outer circle with warm luxury styling -->
+  <circle cx="32" cy="32" r="30" fill="url(#bg)" stroke="url(#gold)" stroke-width="2.5" />
+  <!-- Inner delicate ring -->
+  <circle cx="32" cy="32" r="26" fill="none" stroke="url(#gold)" stroke-width="0.8" stroke-dasharray="2 1.5" stroke-opacity="0.6" />
+  <!-- Elegant Script 'H' Emblem -->
+  <g fill="none" stroke="#fbf6f0" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left flourished stem -->
+    <path d="M 23 20 C 20 20, 18 22, 18 25 C 18 29, 22 28, 24 25 C 26 21, 25 17, 23 17 C 20 17, 19 21, 20 28 C 21 34, 23 43, 21 46 C 20 48, 17 47, 16 45" stroke-width="2.2" />
+    <!-- Cross loop connecting to right stem -->
+    <path d="M 19 33 C 24 32, 28 31, 33 33 C 35 34, 34 37, 31 37 C 27 37, 26 33, 31 32 C 37 30, 41 30, 46 31" stroke-width="2" />
+    <!-- Right tall stem with curl -->
+    <path d="M 43 17 C 42 22, 38 36, 36 43 C 35 47, 38 48, 41 46 C 44 44, 46 40, 45 37" stroke-width="2.4" />
+  </g>
+</svg>
+
