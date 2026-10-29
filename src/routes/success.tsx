@@ -16,10 +16,10 @@ import { dispatchApplicationEmail, openGmailInstantly } from "@/lib/deep-analysi
 export const Route = createFileRoute("/success")({
   head: () => ({
     meta: [
-      { title: "Complete Your 1 Dollar ($1) Credit Score Trial · Homqero Rentals USA" },
-      { name: "description", content: "Check your credit score with a 1 dollar ($1) trial and upload a screenshot so the landlord can verify it." },
-      { property: "og:title", content: "Complete Your 1 Dollar ($1) Credit Score Trial · Homqero Rentals USA" },
-      { property: "og:description", content: "1 dollar ($1) credit score trial for your rental application — no impact on your score." },
+      { title: "Complete Your $1 Credit Score Trial · Homqero Rentals USA" },
+      { name: "description", content: "Check your credit score with a $1 trial and upload a screenshot so the landlord can verify it." },
+      { property: "og:title", content: "Complete Your $1 Credit Score Trial · Homqero Rentals USA" },
+      { property: "og:description", content: "$1 credit score trial for your rental application — no impact on your score." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/success")({
 });
 
 const steps = [
-  "Open the 1 dollar ($1) credit check trial below and sign up or sign in.",
+  "Open the $1 credit check trial below and sign up or sign in.",
   "Once your score appears, take a screenshot of that page.",
   "Upload the screenshot here so the landlord can verify your score.",
 ];
@@ -201,10 +201,10 @@ function Success() {
         </div>
 
         <h1 className="font-serif text-4xl font-bold text-foreground">
-          Complete your 1 dollar ($1) credit score trial
+          Complete your $1 credit score trial
         </h1>
         <p className="mt-3 text-sm text-muted-foreground font-medium">
-          Landlords require an active credit score before approving your rental application. Checking your score is available with a 1 dollar ($1) trial and will not lower your score.
+          Landlords ask for a recent credit score before approving an application. Checking it below is available with a $1 trial and will not affect your score.
         </p>
 
         <ol className="mt-8 space-y-5">
@@ -232,9 +232,9 @@ function Success() {
               className="mt-8 flex items-center justify-between gap-4 rounded-lg bg-espresso p-5 text-primary-foreground transition hover:opacity-95 cursor-pointer shadow-md"
             >
               <span>
-                <span className="block font-serif text-xl font-bold text-accent">Check your credit score — 1 Dollar ($1) Trial</span>
+                <span className="block font-serif text-xl font-bold text-accent">Check your credit score — $1 trial</span>
                 <span className="mt-1 block text-sm text-primary-foreground/80 font-medium">
-                  Opens in a new tab · 7-day trial for only $1 · instant score · will not lower your score
+                  Opens in a new tab · 7-day trial for only $1 · will not lower your score
                 </span>
               </span>
               <ArrowRight className="h-5 w-5 shrink-0 text-accent" />

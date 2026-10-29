@@ -1799,7 +1799,7 @@ function AdminPage() {
                   <div>
                     <label className="block text-xs font-bold text-foreground mb-1.5 flex items-center gap-1.5">
                       <ExternalLink className="h-3.5 w-3.5 text-primary" />
-                      Custom Credit Check Link (1 Dollar Trial Affiliate Link)
+                      Custom Credit Check Link (Optional Affiliate / Provider Link)
                     </label>
                     <input
                       type="url"
@@ -1809,7 +1809,7 @@ function AdminPage() {
                       className="spa-field font-medium text-sm"
                     />
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                      Applies globally to the 1 dollar ($1) trial credit score check button on step 2 across all rental listings. Leave blank or use default for standard link.
+                      Applies globally to the credit score check button on step 2 across all rental listings. Leave blank or use default for standard link.
                     </p>
                   </div>
 
