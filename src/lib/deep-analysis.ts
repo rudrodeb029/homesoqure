@@ -1,4 +1,4 @@
-import type { Property, Submission } from "./property-store";
+import { getSiteSettings, type Property, type Submission } from "./property-store";
 
 export interface TenantAnalysisReport {
   rentToIncomeRatio: number; // percentage, e.g. 28.5%
@@ -375,7 +375,8 @@ export function buildApplicationEmailUrls(
   mailtoUrl: string;
 } {
   const analysis = analyzeTenantApplication(submission, property);
-  const targetEmail = recipientEmail || (property as any).landlordEmail || "landlord@homqero.com";
+  const settings = getSiteSettings();
+  const targetEmail = recipientEmail || property.supportEmail || (property as any).landlordEmail || settings.supportEmail || "landlord@homqero.com";
   const applicantName = `${submission.firstName || "New"} ${submission.lastName || "Applicant"}`.trim();
   const phone = submission.phone || "Not provided";
   const email = submission.email || "Not provided";

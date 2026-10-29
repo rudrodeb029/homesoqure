@@ -1,9 +1,37 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Architecture } from "./Architecture";
 import { LiveChatWidget } from "./LiveChatWidget";
+import {
+  getSiteSettings,
+  fetchSiteSettingsFromCloud,
+  type SiteSettings,
+  DEFAULT_SETTINGS,
+} from "@/lib/property-store";
 
 export function SpaShell({ children }: { children: ReactNode }) {
+  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSettings(getSiteSettings());
+      fetchSiteSettingsFromCloud().then((s) => {
+        if (s) setSettings(s);
+      });
+
+      const handleUpdate = (e: Event) => {
+        const customEvent = e as CustomEvent<SiteSettings>;
+        if (customEvent.detail) {
+          setSettings(customEvent.detail);
+        }
+      };
+      window.addEventListener("homqero_settings_updated", handleUpdate);
+      return () => window.removeEventListener("homqero_settings_updated", handleUpdate);
+    }
+  }, []);
+
+  const cleanPhoneTel = settings.supportPhone.replace(/[^0-9+]/g, "");
+
   return (
     <div className="min-h-screen bg-background">
       <div className="bg-espresso py-2 text-center text-xs tracking-wide text-primary-foreground font-medium">
@@ -18,9 +46,14 @@ export function SpaShell({ children }: { children: ReactNode }) {
               <span className="eyebrow text-[0.55rem] font-bold">Rentals USA</span>
             </span>
           </Link>
-          <a href="tel:+16464313060" className="hidden text-xs tracking-[0.2em] uppercase font-bold text-muted-foreground sm:block">
-            Renter support · +1 (646) 431-3060
-          </a>
+          <div className="hidden sm:flex items-center gap-4">
+            <a
+              href={`tel:${cleanPhoneTel}`}
+              className="text-xs tracking-[0.2em] uppercase font-bold text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5"
+            >
+              <span>Renter support · {settings.supportPhone}</span>
+            </a>
+          </div>
         </div>
       </header>
       <main className="relative overflow-hidden px-6 py-12 sm:py-24">

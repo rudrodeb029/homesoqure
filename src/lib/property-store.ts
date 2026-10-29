@@ -8,9 +8,25 @@ export interface Property {
   imageUrl?: string;
   creditCheckUrl?: string;
   supportPhone?: string;
+  supportEmail?: string;
   notes?: string;
   createdAt: string;
 }
+
+export interface SiteSettings {
+  supportPhone: string;
+  supportEmail: string;
+  landlordName?: string;
+  lastUpdated?: string;
+}
+
+export const DEFAULT_SETTINGS: SiteSettings = {
+  supportPhone: "+1 (646) 431-3060",
+  supportEmail: "landlord@homqero.com",
+  landlordName: "Homqero Rentals Management",
+};
+
+const SETTINGS_KEY = "homqero_site_settings_v1";
 
 export type SubmissionStatus = "completed" | "pending_credit" | "incomplete";
 
@@ -78,6 +94,73 @@ export function getPropertyById(id?: string | null): Property {
   if (!id) return properties[0] ?? DEFAULT_PROPERTY;
   const found = properties.find((p) => p.id.toLowerCase() === id.toLowerCase());
   return found || properties[0] || DEFAULT_PROPERTY;
+}
+
+export function getSiteSettings(): SiteSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
+      return DEFAULT_SETTINGS;
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      supportPhone: parsed.supportPhone || DEFAULT_SETTINGS.supportPhone,
+      supportEmail: parsed.supportEmail || DEFAULT_SETTINGS.supportEmail,
+      landlordName: parsed.landlordName || DEFAULT_SETTINGS.landlordName,
+      lastUpdated: parsed.lastUpdated,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export async function saveSiteSettings(updates: Partial<SiteSettings>): Promise<SiteSettings> {
+  const current = getSiteSettings();
+  const updated: SiteSettings = {
+    ...current,
+    ...updates,
+    lastUpdated: new Date().toISOString(),
+  };
+
+  if (typeof window !== "undefined") {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent("homqero_settings_updated", { detail: updated }));
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      const { db } = await import("./firebase");
+      await setDoc(doc(db, "settings", "general"), cleanForFirestore(updated as unknown as Record<string, unknown>), { merge: true });
+    } catch (err) {
+      console.warn("Firestore saveSiteSettings error:", err);
+    }
+  }
+
+  return updated;
+}
+
+export async function fetchSiteSettingsFromCloud(): Promise<SiteSettings> {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const { doc, getDoc } = await import("firebase/firestore");
+    const { db } = await import("./firebase");
+    const snap = await getDoc(doc(db, "settings", "general"));
+    if (snap.exists()) {
+      const data = snap.data() as Partial<SiteSettings>;
+      const merged: SiteSettings = {
+        supportPhone: data.supportPhone || DEFAULT_SETTINGS.supportPhone,
+        supportEmail: data.supportEmail || DEFAULT_SETTINGS.supportEmail,
+        landlordName: data.landlordName || DEFAULT_SETTINGS.landlordName,
+        lastUpdated: data.lastUpdated,
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent("homqero_settings_updated", { detail: merged }));
+      return merged;
+    }
+  } catch (err) {
+    console.warn("Firestore fetchSiteSettings error:", err);
+  }
+  return getSiteSettings();
 }
 
 function cleanForFirestore<T extends Record<string, unknown>>(obj: T): T {

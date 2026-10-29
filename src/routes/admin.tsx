@@ -26,6 +26,8 @@ import {
   Send,
   Mail,
   Sparkles,
+  Phone,
+  PhoneCall,
 } from "lucide-react";
 import {
   getProperties,
@@ -35,8 +37,13 @@ import {
   deleteSubmission,
   subscribeToCloudSubmissions,
   subscribeToCloudProperties,
+  getSiteSettings,
+  saveSiteSettings,
+  fetchSiteSettingsFromCloud,
   type Property,
   type Submission,
+  type SiteSettings,
+  DEFAULT_SETTINGS,
 } from "@/lib/property-store";
 import {
   subscribeToAllChatThreads,
@@ -69,8 +76,8 @@ function AdminPage() {
   const [passwordError, setPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Tab state: "properties" | "submissions" | "chat" | "security"
-  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "chat" | "security">("properties");
+  // Tab state: "properties" | "submissions" | "chat" | "settings" | "security"
+  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "chat" | "settings" | "security">("properties");
   const [submissionFilter, setSubmissionFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
   const [selectedScreenshotModal, setSelectedScreenshotModal] = useState<{
     url: string;
@@ -97,6 +104,14 @@ function AdminPage() {
   const [confirmNewPasswordInput, setConfirmNewPasswordInput] = useState("");
   const [changePasswordMsg, setChangePasswordMsg] = useState("");
 
+  // Global Support & Notification Settings state
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
+  const [settingsSupportPhone, setSettingsSupportPhone] = useState(DEFAULT_SETTINGS.supportPhone);
+  const [settingsSupportEmail, setSettingsSupportEmail] = useState(DEFAULT_SETTINGS.supportEmail);
+  const [settingsLandlordName, setSettingsLandlordName] = useState(DEFAULT_SETTINGS.landlordName || "");
+  const [settingsSaveMsg, setSettingsSaveMsg] = useState("");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
   const [properties, setProperties] = useState<Property[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
 
@@ -110,6 +125,7 @@ function AdminPage() {
   const [imageFileName, setImageFileName] = useState("");
   const [creditCheckUrl, setCreditCheckUrl] = useState("");
   const [supportPhone, setSupportPhone] = useState("+1 (646) 431-3060");
+  const [supportEmail, setSupportEmail] = useState("landlord@homqero.com");
   const [notes, setNotes] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +147,20 @@ function AdminPage() {
       if (session === "authenticated") {
         setIsAuthenticated(true);
       }
+      const s = getSiteSettings();
+      setSiteSettings(s);
+      setSettingsSupportPhone(s.supportPhone);
+      setSettingsSupportEmail(s.supportEmail);
+      setSettingsLandlordName(s.landlordName || "");
+
+      fetchSiteSettingsFromCloud().then((cloudSettings) => {
+        if (cloudSettings) {
+          setSiteSettings(cloudSettings);
+          setSettingsSupportPhone(cloudSettings.supportPhone);
+          setSettingsSupportEmail(cloudSettings.supportEmail);
+          setSettingsLandlordName(cloudSettings.landlordName || "");
+        }
+      });
     }
     refreshData();
 
@@ -275,7 +305,8 @@ function AdminPage() {
       price: Number(price) || 0,
       imageUrl: imageUrl.trim() || undefined,
       creditCheckUrl: creditCheckUrl.trim() || "#",
-      supportPhone: supportPhone.trim() || "+1 (646) 431-3060",
+      supportPhone: supportPhone.trim() || settingsSupportPhone.trim() || "+1 (646) 431-3060",
+      supportEmail: supportEmail.trim() || settingsSupportEmail.trim() || "landlord@homqero.com",
       notes: notes.trim(),
     });
 
@@ -287,9 +318,31 @@ function AdminPage() {
     setImageUrl("");
     setImageFileName("");
     setCreditCheckUrl("");
+    setSupportEmail(settingsSupportEmail || "landlord@homqero.com");
     setNotes("");
     setIsCreating(false);
     refreshData();
+  };
+
+  const handleSaveSiteSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsSaveMsg("");
+
+    try {
+      const updated = await saveSiteSettings({
+        supportPhone: settingsSupportPhone.trim(),
+        supportEmail: settingsSupportEmail.trim(),
+        landlordName: settingsLandlordName.trim(),
+      });
+      setSiteSettings(updated);
+      setSettingsSaveMsg("✓ Support email and phone number updated successfully!");
+      setTimeout(() => setSettingsSaveMsg(""), 4000);
+    } catch {
+      setSettingsSaveMsg("Error saving settings. Please try again.");
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -541,7 +594,24 @@ function AdminPage() {
             <span>Post New Property</span>
           </button>
 
-          {/* 5. Password & Security */}
+          {/* 5. Support Email & Phone Settings */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("settings");
+              setIsCreating(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === "settings"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-foreground/80 hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <PhoneCall className="h-4 w-4" />
+            <span>Support Email &amp; Phone</span>
+          </button>
+
+          {/* 6. Password & Security */}
           <button
             type="button"
             onClick={() => {
@@ -601,7 +671,9 @@ function AdminPage() {
         <header className="border-b border-border bg-card px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="font-serif text-2xl font-bold leading-tight">
-              {activeTab === "security"
+              {activeTab === "settings"
+                ? "Support Email & Phone Configuration"
+                : activeTab === "security"
                 ? "Password & Security Settings"
                 : activeTab === "chat"
                 ? "Live Landlord Chat Support"
@@ -612,7 +684,9 @@ function AdminPage() {
                 : "Rental Property Postings"}
             </h1>
             <p className="text-xs text-muted-foreground font-medium">
-              {activeTab === "security"
+              {activeTab === "settings"
+                ? "Configure the official support phone number and landlord email address across your website and tenant applications."
+                : activeTab === "security"
                 ? "Manage your admin portal access password."
                 : activeTab === "chat"
                 ? "Chat directly in real-time with prospective tenants visiting your rental listings."
@@ -641,7 +715,7 @@ function AdminPage() {
         {/* Main Content Workspace */}
         <main className="p-6 max-w-6xl w-full">
           {/* Quick Metrics Bar */}
-          {activeTab !== "security" && (
+          {activeTab !== "security" && activeTab !== "settings" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div
                 onClick={() => {
@@ -871,7 +945,7 @@ function AdminPage() {
                 </div>
 
                 {/* Custom Links & Contacts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold mb-1 text-foreground">
                       Custom Credit Check Link <span className="font-normal text-muted-foreground">(Optional affiliate link)</span>
@@ -889,6 +963,16 @@ function AdminPage() {
                       placeholder="+1 (646) 431-3060"
                       value={supportPhone}
                       onChange={(e) => setSupportPhone(e.target.value)}
+                      className="spa-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Support / Landlord Email</label>
+                    <input
+                      type="email"
+                      placeholder="landlord@homqero.com"
+                      value={supportEmail}
+                      onChange={(e) => setSupportEmail(e.target.value)}
                       className="spa-field"
                     />
                   </div>
@@ -1575,6 +1659,129 @@ function AdminPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ------------------------------------------------------- */}
+          {/* VIEW: SUPPORT EMAIL & PHONE SETTINGS */}
+          {/* ------------------------------------------------------- */}
+          {activeTab === "settings" && (
+            <div className="max-w-2xl space-y-6">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
+                  <PhoneCall className="h-5 w-5 text-primary" />
+                  <h2 className="font-serif text-xl font-bold">Edit Support Phone &amp; Email</h2>
+                </div>
+                <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
+                  Configure the primary support phone number and landlord email address. These details appear on the website header and determine where tenant applications and deep analysis reports are delivered.
+                </p>
+
+                <form onSubmit={handleSaveSiteSettings} className="space-y-5">
+                  {/* Support Phone Number */}
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-primary" />
+                      Renter Support Phone Number *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="+1 (646) 431-3060"
+                      value={settingsSupportPhone}
+                      onChange={(e) => setSettingsSupportPhone(e.target.value)}
+                      className="spa-field font-medium text-sm"
+                    />
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      Displayed on the website header: <span className="font-semibold text-foreground">Renter support · {settingsSupportPhone || "+1 (646) 431-3060"}</span>
+                    </p>
+                  </div>
+
+                  {/* Support & Notification Email */}
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-primary" />
+                      Landlord / Support Notification Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="landlord@homqero.com"
+                      value={settingsSupportEmail}
+                      onChange={(e) => setSettingsSupportEmail(e.target.value)}
+                      className="spa-field font-medium text-sm"
+                    />
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      Destination email for tenant prescreenings, deep analysis summaries, and direct Gmail compose links.
+                    </p>
+                  </div>
+
+                  {/* Management / Landlord Display Name */}
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-primary" />
+                      Landlord / Company Display Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Homqero Rentals Management"
+                      value={settingsLandlordName}
+                      onChange={(e) => setSettingsLandlordName(e.target.value)}
+                      className="spa-field font-medium text-sm"
+                    />
+                  </div>
+
+                  {settingsSaveMsg && (
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>{settingsSaveMsg}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-3 flex items-center justify-between border-t border-border">
+                    <p className="text-[0.7rem] text-muted-foreground">
+                      Last updated: <span className="font-medium text-foreground">{siteSettings.lastUpdated ? new Date(siteSettings.lastUpdated).toLocaleDateString() : "Default"}</span>
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={isSavingSettings}
+                      className="rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      {isSavingSettings ? "Saving..." : "Save Settings"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Live Preview Card */}
+              <div className="rounded-xl border border-border bg-secondary/30 p-5">
+                <p className="text-xs font-bold text-foreground mb-3 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-accent" />
+                  Live Preview of Configured Support Details
+                </p>
+                <div className="space-y-3 text-xs">
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                      Website Header Preview
+                    </span>
+                    <div className="flex items-center justify-between bg-card p-2 rounded border border-border/60">
+                      <span className="font-serif font-bold text-foreground">Homqero</span>
+                      <span className="text-[0.7rem] font-bold text-primary tracking-wider uppercase">
+                        Renter support · {settingsSupportPhone || "+1 (646) 431-3060"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                      Applicant Email Delivery Preview
+                    </span>
+                    <div className="space-y-1 font-mono text-[0.75rem] text-muted-foreground">
+                      <p>To: <strong className="text-foreground">{settingsSupportEmail || "landlord@homqero.com"}</strong></p>
+                      <p>Subject: <span className="text-foreground">[Rental Application &amp; Deep Analysis] 406 SE Railroad St - John Doe</span></p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

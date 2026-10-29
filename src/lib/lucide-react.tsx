@@ -343,6 +343,8 @@ export function Phone(props: IconProps) {
   );
 }
 
+export const PhoneCall = Phone;
+
 export function User(props: IconProps) {
   return (
     <BaseIcon {...props}>
