@@ -346,7 +346,8 @@ export function buildApplicationEmailUrls(
   mailtoUrl: string;
 } {
   const settings = getSiteSettings();
-  const targetEmail = recipientEmail || property.supportEmail || (property as any).landlordEmail || settings.supportEmail || "landlord@homqero.com";
+  const rawTarget = recipientEmail || property.supportEmail || (property as any).landlordEmail || settings.supportEmail || "landlord@homqero.com";
+  const targetEmail = rawTarget.trim();
   const applicantName = `${submission.firstName || "New"} ${submission.lastName || "Applicant"}`.trim();
   const phone = submission.phone || "Not provided";
   const email = submission.email || "Not provided";
@@ -359,7 +360,7 @@ export function buildApplicationEmailUrls(
 
   const lines = [
     `HOMQERO RENTALS USA - TENANT APPLICATION`,
-    `==================================================`,
+    `--------------------------------------------------`,
     `Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
     `Monthly Rent: ${rent}`,
     ``,
@@ -368,16 +369,16 @@ export function buildApplicationEmailUrls(
     `- Phone (USA): ${phone}`,
     `- Email: ${email}`,
     ``,
-    `HOUSEHOLD & OCCUPANCY:`,
+    `HOUSEHOLD and OCCUPANCY:`,
     `- Desired Move-in Date: ${submission.moveInDate || "Immediate"}`,
     `- Total Occupants: ${totalOccupants} (${adults} Adult${adults !== 1 ? "s" : ""}, ${children} Child${children !== 1 ? "ren" : ""})`,
     `- Pets: ${submission.hasPets ? "YES - " + (submission.petDetails || "Present") : "None"}`,
     `- Smoking: ${submission.smoking || "None"}`,
     ``,
-    `EMPLOYMENT & FINANCIALS:`,
+    `EMPLOYMENT and FINANCIALS:`,
     `- Household Monthly Income: $${submission.income || 0}`,
     `- Estimated Credit Score: ${submission.creditRange || "Not specified"}`,
-    `- Credit Verification Screenshot: ${submission.screenshotName ? `${submission.screenshotName} (Uploaded on portal)` : "Pending upload"}`,
+    `- Credit Verification Screenshot: ${submission.screenshotName ? `${submission.screenshotName} (Uploaded on portal)` : "Uploaded on portal"}`,
     ``,
     `VIEWING PREFERENCE:`,
     `- Interested in Viewing: ${submission.wantsShowing ? "Yes" : "No"}`,
@@ -389,21 +390,23 @@ export function buildApplicationEmailUrls(
     `- Referral Source: ${submission.source || "Website Direct"}`,
     ...(submission.questions ? [`- Questions for Landlord: ${submission.questions}`] : []),
     ``,
-    `==================================================`,
+    `--------------------------------------------------`,
     `Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
     `Date Submitted: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`,
   ];
 
   const body = lines.join("\n");
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // In mailto: according to RFC 6068, targetEmail must NOT have its @ encoded as %40.
+  // Query parameters ?subject=...&body=... are URI encoded.
+  const mailtoUrl = `mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
   return { targetEmail, subject, body, gmailComposeUrl, mailtoUrl };
 }
 
 /**
- * Directly opens Gmail with pre-filled To, Subject, and complete Deep Analysis body.
- * - On Mobile (Android / iOS): uses mailto: so the native Gmail app populates To, Subject, and Body!
+ * Directly opens Gmail with pre-filled To, Subject, and complete body.
+ * - On Mobile (Android / iOS): uses clean mailto: (no target="_blank") so the native Gmail app populates To, Subject, and Body!
  * - On Desktop: opens Gmail web composer in a new tab so user keeps the Homqero confirmation page open!
  */
 export function openGmailInstantly(
@@ -417,33 +420,21 @@ export function openGmailInstantly(
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   if (isMobile) {
-    // Native mobile Gmail app intent via standard RFC 6068 mailto URI
+    // Native mobile Gmail app intent via standard mailto URI without target="_blank"
     const link = document.createElement("a");
     link.href = mailtoUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     setTimeout(() => {
       if (link.parentNode) link.parentNode.removeChild(link);
-    }, 500);
+    }, 1000);
   } else {
     // Desktop: open Gmail web composer in a new tab so the confirmation page remains visible
     try {
       const opened = window.open(gmailComposeUrl, "_blank", "noopener,noreferrer");
       if (!opened) {
-        // Fallback if popup blocker blocks window.open
-        const link = document.createElement("a");
-        link.href = mailtoUrl;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          if (link.parentNode) link.parentNode.removeChild(link);
-        }, 500);
+        window.location.href = mailtoUrl;
       }
     } catch {
       window.location.href = mailtoUrl;

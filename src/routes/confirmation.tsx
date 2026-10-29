@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { SpaShell } from "@/components/SpaShell";
-import { Check, Clock, Home, MessageCircle, Mail } from "@/lib/lucide-react";
+import { Check, Clock, Home, MessageCircle, Mail, ExternalLink, Copy } from "@/lib/lucide-react";
 import { getPropertyById, getLatestSubmission, type Property, type Submission, DEFAULT_PROPERTY } from "@/lib/property-store";
-import { openGmailInstantly } from "@/lib/deep-analysis";
+import { openGmailInstantly, buildApplicationEmailUrls } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/confirmation")({
   head: () => ({
@@ -33,6 +33,7 @@ function HouseMark() {
 export function ConfirmationPage() {
   const [property, setProperty] = useState<Property>(DEFAULT_PROPERTY);
   const [submission, setSubmission] = useState<Submission | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -48,6 +49,19 @@ export function ConfirmationPage() {
     day: "numeric",
     year: "numeric",
   });
+
+  const emailUrls = submission ? buildApplicationEmailUrls(submission, property) : null;
+
+  const handleCopyDetails = async () => {
+    if (!emailUrls) return;
+    try {
+      await navigator.clipboard.writeText(`To: ${emailUrls.targetEmail}\nSubject: ${emailUrls.subject}\n\n${emailUrls.body}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      // fallback
+    }
+  };
 
   return (
     <SpaShell>
@@ -115,9 +129,9 @@ export function ConfirmationPage() {
                 <Check className="h-4 w-4 stroke-[3]" />
               </div>
               <div className="pt-0.5">
-                <p className="text-sm font-bold text-foreground">1. Application &amp; Credit Score Received</p>
+                <p className="text-sm font-bold text-foreground">1. Application &amp; $1 Trial Credit Score Received</p>
                 <p className="mt-0.5 text-xs text-muted-foreground font-medium">
-                  Your household income, desired move-in date, pet preferences, and credit verification were securely transmitted.
+                  Your household income, desired move-in date, pet preferences, and credit verification screenshot were securely transmitted.
                 </p>
               </div>
             </div>
@@ -157,20 +171,43 @@ export function ConfirmationPage() {
         <div className="rounded-xl border border-primary/20 bg-secondary/50 p-5 text-center">
           <p className="font-bold text-sm text-foreground">Open Application in Gmail</p>
           <p className="mt-1 text-xs text-muted-foreground font-medium">
-            Your application details and title are prepared for the landlord. Tap below if you need to view or send it in Gmail:
+            Your application details, title, and target landlord recipient are fully prepared:
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              if (submission) {
-                openGmailInstantly(submission, property);
-              }
-            }}
-            className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs"
-          >
-            <Mail className="h-4 w-4" />
-            <span>Open in Gmail App</span>
-          </button>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (submission) {
+                  openGmailInstantly(submission, property);
+                }
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs"
+            >
+              <Mail className="h-4 w-4" />
+              <span>Open in Gmail App</span>
+            </button>
+
+            {emailUrls && (
+              <a
+                href={emailUrls.gmailComposeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition cursor-pointer shadow-xs"
+              >
+                <ExternalLink className="h-4 w-4 text-primary" />
+                <span>Open in Web Gmail</span>
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={handleCopyDetails}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition cursor-pointer shadow-xs"
+            >
+              <Copy className="h-4 w-4 text-primary" />
+              <span>{copied ? "Copied to Clipboard!" : "Copy Details"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Live Chat prompt card */}

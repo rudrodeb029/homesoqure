@@ -18,9 +18,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Tell the Landlord About Yourself · Homqero Rentals USA" },
-      { name: "description", content: "Homqero rental prescreener: share employment, income, credit score and move-in details with the landlord." },
+      { name: "description", content: "Homqero rental prescreener: share employment, income, 1 dollar ($1) trial credit score and move-in details with the landlord." },
       { property: "og:title", content: "Tell the Landlord About Yourself · Homqero Rentals USA" },
-      { property: "og:description", content: "Quick rental prescreener for US apartments and homes." },
+      { property: "og:description", content: "Quick rental prescreener with 1 dollar ($1) credit score trial for US apartments and homes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -443,7 +443,7 @@ function Index() {
           <Q
             id="q-creditRange"
             label="What is your estimated credit score?"
-            hint="Your exact score will be verified after you complete an application."
+            hint="Your exact score will be verified on Step 2 with an affordable 1 dollar ($1) trial that will not lower your score."
             required
             error={errors.creditRange}
           >
@@ -940,7 +940,7 @@ function Index() {
             <div>
               <p className="font-bold text-sm">Please complete all required fields above</p>
               <p className="mt-0.5 text-red-600/90 dark:text-red-400">
-                Sections highlighted in red need your attention before proceeding to the credit verification step.
+                Sections highlighted in red need your attention before proceeding to the 1 dollar ($1) trial credit verification step.
               </p>
             </div>
           </div>
