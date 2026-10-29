@@ -361,7 +361,7 @@ export async function dispatchApplicationEmail(
 }
 
 /**
- * Builds email subject, body, Gmail web compose URL, and mailto URL for instant sending.
+ * Builds email subject, full deep analysis body, Gmail web compose URL, and mailto URL for instant sending.
  */
 export function buildApplicationEmailUrls(
   submission: Partial<Submission>,
@@ -374,49 +374,65 @@ export function buildApplicationEmailUrls(
   gmailComposeUrl: string;
   mailtoUrl: string;
 } {
+  const analysis = analyzeTenantApplication(submission, property);
   const targetEmail = recipientEmail || (property as any).landlordEmail || "landlord@homqero.com";
-  const applicantName = `${submission.firstName || ""} ${submission.lastName || ""}`.trim() || "Prospective Tenant";
-  const subject = `New Rental Application for ${property.address} - ${applicantName}`;
+  const applicantName = `${submission.firstName || "New"} ${submission.lastName || "Applicant"}`.trim();
+  const phone = submission.phone || "Not provided";
+  const email = submission.email || "Not provided";
+  const rent = property.price ? `$${property.price}/month` : "Standard Rent";
+
+  const subject = `[Rental Application & Deep Analysis] ${property.address} - ${applicantName} (${analysis.overallVerdict})`;
 
   const lines = [
-    `HOMQERO RENTALS USA — RENTAL APPLICATION DETAILS`,
+    `HOMQERO RENTALS USA - TENANT APPLICATION & DEEP ANALYSIS`,
     `==================================================`,
+    `Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
+    `Monthly Rent: ${rent}`,
+    `Applicant: ${applicantName}`,
+    `Phone (USA): ${phone}`,
+    `Email: ${email}`,
+    `Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
+    `Date: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`,
     ``,
-    `RENTAL PROPERTY:`,
-    `• Target Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
-    `• Monthly Rent: $${property.price}/month`,
-    `• Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
+    `EXECUTIVE SUMMARY`,
+    `--------------------------------------------------`,
+    `Overall Verdict: ${analysis.overallVerdict} (Score: ${analysis.overallScore}/100)`,
+    `${analysis.executiveSummary}`,
     ``,
-    `APPLICANT CONTACT DETAILS:`,
-    `• Full Name: ${applicantName}`,
-    `• Email: ${submission.email || "Not provided"}`,
-    `• Phone (USA): ${submission.phone || "Not provided"}`,
+    `FINANCIAL & CREDIT DEEP ANALYSIS`,
+    `--------------------------------------------------`,
+    `- Household Monthly Income: $${submission.income || 0}`,
+    `- Rent-to-Income Multiplier: ${analysis.incomeMultiplier}x Rent`,
+    `- Income Assessment: ${analysis.incomeAssessment}`,
+    `- Estimated Credit Score: ${submission.creditRange || "Not specified"} (${analysis.creditTier})`,
+    `- Credit Risk: ${analysis.creditRisk.toUpperCase()}`,
+    `- Credit Assessment: ${analysis.creditAssessment}`,
     ``,
-    `FINANCIAL & EMPLOYMENT DETAILS:`,
-    `• Household Monthly Income: $${submission.income || "0"}`,
-    `• Estimated Credit Score: ${submission.creditRange || "Not specified"}`,
-    `• Credit Score Screenshot: ${submission.screenshotName ? `${submission.screenshotName} (Uploaded on portal)` : "Uploaded via application portal"}`,
+    `MOVE-IN & OCCUPANCY DETAILS`,
+    `--------------------------------------------------`,
+    `- Desired Move-in Date: ${submission.moveInDate || "Immediate"}`,
+    `- Number of Occupants: ${submission.people || 1} (${analysis.occupancyAssessment})`,
+    `- Pets: ${submission.hasPets ? "YES - " + (submission.petDetails || "Pets declared") : "None"}`,
+    `- Smoking: ${submission.smoking || "None"}`,
+    `- Showing Request: ${analysis.showingAssessment}`,
+    `- Referral Source: ${submission.source || "Website Direct"}`,
+    `- Questions for Landlord: ${submission.questions || "None provided"}`,
     ``,
-    `MOVE-IN & OCCUPANCY PREFERENCES:`,
-    `• Desired Move-In Date: ${submission.moveInDate || "Immediate"}`,
-    `• Number of Occupants: ${submission.people || 1}`,
-    `• Pets: ${submission.hasPets ? `Yes (${submission.petDetails || "Present"})` : "None"}`,
-    `• Smoking: ${submission.smoking || "None"}`,
-    `• In-Person Showing: ${submission.wantsShowing ? "Yes" : "No"}`,
-    ...(submission.showingTypes && submission.showingTypes.length > 0
-      ? [`• Showing Availability: ${submission.showingTypes.join(", ")}`]
-      : []),
+    `CREDIT VERIFICATION SCREENSHOT`,
+    `--------------------------------------------------`,
+    `Screenshot File: ${submission.screenshotName || "Uploaded on portal"}`,
+    `Verification Status: Recorded in Landlord Portal.`,
     ``,
-    `ADDITIONAL DETAILS:`,
-    `• Referral Source: ${submission.source || "Website"}`,
-    `• Questions for Landlord: ${submission.questions || "None"}`,
+    `LANDLORD RECOMMENDATIONS & ACTION CHECKLIST`,
+    `--------------------------------------------------`,
+    ...analysis.recommendations.map((r, i) => `${i + 1}. ${r}`),
     ``,
     `==================================================`,
-    `Sent from Homqero Rentals Application Portal`,
+    `Homqero Rentals USA - Rental Prescreening Portal`,
     `https://homesoqure.web.app`,
   ];
 
-  const body = lines.join("\r\n");
+  const body = lines.join("\n");
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -424,8 +440,9 @@ export function buildApplicationEmailUrls(
 }
 
 /**
- * Directly navigates the browser to the Gmail compose section with pre-filled title (subject),
- * landlord recipient, and complete structured application info.
+ * Directly opens Gmail with pre-filled To, Subject, and complete Deep Analysis body.
+ * - On Mobile (Android / iOS): uses mailto: so the native Gmail app populates To, Subject, and Body!
+ * - On Desktop: navigates to Gmail web compose with To, Subject, and Body!
  */
 export function openGmailInstantly(
   submission: Partial<Submission>,
@@ -434,8 +451,26 @@ export function openGmailInstantly(
 ): void {
   if (typeof window === "undefined") return;
 
-  const { gmailComposeUrl } = buildApplicationEmailUrls(submission, property, recipientEmail);
-  window.location.href = gmailComposeUrl;
+  const { gmailComposeUrl, mailtoUrl } = buildApplicationEmailUrls(submission, property, recipientEmail);
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // Native mobile Gmail app intent via standard RFC 6068 mailto URI
+    const link = document.createElement("a");
+    link.href = mailtoUrl;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) link.parentNode.removeChild(link);
+    }, 400);
+
+    // Direct location fallback for mobile webviews
+    window.location.href = mailtoUrl;
+  } else {
+    // Desktop: direct navigation to Gmail web composer
+    window.location.href = gmailComposeUrl;
+  }
 }
 
 /**
