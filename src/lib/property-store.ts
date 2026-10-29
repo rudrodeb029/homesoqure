@@ -18,6 +18,7 @@ export interface SiteSettings {
   supportEmail: string;
   landlordName?: string;
   creditCheckUrl?: string;
+  chatAutoReply?: string;
   lastUpdated?: string;
 }
 
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   supportEmail: "landlord@homqero.com",
   landlordName: "Homqero Rentals Management",
   creditCheckUrl: "https://www.myscoreiq.com",
+  chatAutoReply: "Your application is currently being reviewed by Landloard. We'll update you shortly!",
 };
 
 const SETTINGS_KEY = "homqero_site_settings_v1";
@@ -116,6 +118,7 @@ export function getSiteSettings(): SiteSettings {
       supportEmail: parsed.supportEmail || DEFAULT_SETTINGS.supportEmail,
       landlordName: parsed.landlordName || DEFAULT_SETTINGS.landlordName,
       creditCheckUrl: parsed.creditCheckUrl || DEFAULT_SETTINGS.creditCheckUrl,
+      chatAutoReply: parsed.chatAutoReply || DEFAULT_SETTINGS.chatAutoReply,
       lastUpdated: parsed.lastUpdated,
     };
   } catch {
@@ -159,6 +162,7 @@ export async function fetchSiteSettingsFromCloud(): Promise<SiteSettings> {
         supportEmail: data.supportEmail || DEFAULT_SETTINGS.supportEmail,
         landlordName: data.landlordName || DEFAULT_SETTINGS.landlordName,
         creditCheckUrl: data.creditCheckUrl || DEFAULT_SETTINGS.creditCheckUrl,
+        chatAutoReply: data.chatAutoReply || DEFAULT_SETTINGS.chatAutoReply,
         lastUpdated: data.lastUpdated,
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));

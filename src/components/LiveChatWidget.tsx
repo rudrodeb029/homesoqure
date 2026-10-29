@@ -6,13 +6,18 @@ import {
   sendChatMessage,
   type ChatMessage,
 } from "@/lib/chat-store";
-import { getLatestSubmission, getProperties } from "@/lib/property-store";
+import {
+  getLatestSubmission,
+  getProperties,
+  getSiteSettings,
+} from "@/lib/property-store";
 
 export function LiveChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [hasUnread, setHasUnread] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [chatId, setChatId] = useState("");
 
@@ -62,6 +67,32 @@ export function LiveChatWidget() {
       tenantPhone: active?.phone || "",
       propertyAddress: propAddress,
     });
+
+    // Fast auto-reply on first message:
+    const autoReplyKey = `homqero_autoreply_sent_${chatId}`;
+    const alreadyReplied = sessionStorage.getItem(autoReplyKey) || localStorage.getItem(autoReplyKey);
+    const hasAdminMsg = messages.some((m) => m.sender === "admin");
+
+    if (!alreadyReplied && !hasAdminMsg) {
+      sessionStorage.setItem(autoReplyKey, "true");
+      localStorage.setItem(autoReplyKey, "true");
+
+      const settings = getSiteSettings();
+      const autoReplyText =
+        settings.chatAutoReply ||
+        "Your application is currently being reviewed by Landloard. We'll update you shortly!";
+
+      setIsTyping(true);
+      setTimeout(async () => {
+        setIsTyping(false);
+        await sendChatMessage(chatId, "admin", autoReplyText, {
+          tenantName,
+          tenantEmail: active?.email || "",
+          tenantPhone: active?.phone || "",
+          propertyAddress: propAddress,
+        });
+      }, 800);
+    }
   };
 
   return (
@@ -157,6 +188,16 @@ export function LiveChatWidget() {
                 </div>
               );
             })}
+            {isTyping && (
+              <div className="flex flex-col items-start animate-in fade-in duration-200">
+                <span className="text-[0.65rem] font-semibold text-muted-foreground px-1 mb-1">Landlord Support</span>
+                <div className="rounded-2xl rounded-bl-xs border border-border bg-card px-3.5 py-2.5 text-xs text-muted-foreground flex items-center gap-1.5 shadow-2xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 

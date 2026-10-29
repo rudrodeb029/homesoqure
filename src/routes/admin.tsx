@@ -111,6 +111,7 @@ function AdminPage() {
   const [settingsSupportEmail, setSettingsSupportEmail] = useState(DEFAULT_SETTINGS.supportEmail);
   const [settingsLandlordName, setSettingsLandlordName] = useState(DEFAULT_SETTINGS.landlordName || "");
   const [settingsCreditCheckUrl, setSettingsCreditCheckUrl] = useState(DEFAULT_SETTINGS.creditCheckUrl || "");
+  const [settingsChatAutoReply, setSettingsChatAutoReply] = useState(DEFAULT_SETTINGS.chatAutoReply || "");
   const [settingsSaveMsg, setSettingsSaveMsg] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -158,6 +159,7 @@ function AdminPage() {
       setSettingsSupportEmail(s.supportEmail);
       setSettingsLandlordName(s.landlordName || "");
       setSettingsCreditCheckUrl(s.creditCheckUrl || "");
+      setSettingsChatAutoReply(s.chatAutoReply || DEFAULT_SETTINGS.chatAutoReply || "");
 
       fetchSiteSettingsFromCloud().then((cloudSettings) => {
         if (cloudSettings) {
@@ -166,6 +168,7 @@ function AdminPage() {
           setSettingsSupportEmail(cloudSettings.supportEmail);
           setSettingsLandlordName(cloudSettings.landlordName || "");
           setSettingsCreditCheckUrl(cloudSettings.creditCheckUrl || "");
+          setSettingsChatAutoReply(cloudSettings.chatAutoReply || DEFAULT_SETTINGS.chatAutoReply || "");
         }
       });
     }
@@ -342,6 +345,7 @@ function AdminPage() {
         supportEmail: settingsSupportEmail.trim(),
         landlordName: settingsLandlordName.trim(),
         creditCheckUrl: settingsCreditCheckUrl.trim(),
+        chatAutoReply: settingsChatAutoReply.trim(),
       });
       setSiteSettings(updated);
       setSettingsSaveMsg("✓ Support phone, email, and custom credit check link updated successfully!");
@@ -1674,7 +1678,7 @@ function AdminPage() {
                           <span className="text-[0.65rem] font-bold uppercase text-muted-foreground tracking-wider mr-1">Quick Replies:</span>
                           {[
                             "Hello! Thank you for applying. When would you like to schedule an in-person tour?",
-                            "Your application is currently being reviewed by our team. We'll update you shortly!",
+                            "Your application is currently being reviewed by Landloard. We'll update you shortly!",
                             "We received your credit score screenshot. Everything looks great!",
                             "Could you confirm your intended move-in date?",
                           ].map((tmpl) => (
@@ -1810,6 +1814,24 @@ function AdminPage() {
                     />
                     <p className="mt-1 text-[0.7rem] text-muted-foreground">
                       Applies globally to the credit score check button on step 2 across all rental listings. Leave blank or use default for standard link.
+                    </p>
+                  </div>
+
+                  {/* First Message Live Chat Auto-Reply */}
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                      Live Chat Auto-Reply Message
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Your application is currently being reviewed by Landloard. We'll update you shortly!"
+                      value={settingsChatAutoReply}
+                      onChange={(e) => setSettingsChatAutoReply(e.target.value)}
+                      className="spa-field font-medium text-sm w-full rounded-md border border-input bg-background p-2.5"
+                    />
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      Automatically sent to prospective tenants right after they send their first message in live chat.
                     </p>
                   </div>
 
