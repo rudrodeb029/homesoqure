@@ -217,8 +217,6 @@ LANDLORD RECOMMENDATIONS & ACTION CHECKLIST
 --------------------------------------------------------------------------------
 ${analysis.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
 
-Direct Admin Portal Access: https://homesoqure.web.app/admin
-Homqero Rentals USA — Powered by Firestore Real-Time Lead Engine
 ================================================================================
 `.trim();
 
@@ -429,8 +427,6 @@ export function buildApplicationEmailUrls(
     ...analysis.recommendations.map((r, i) => `${i + 1}. ${r}`),
     ``,
     `==================================================`,
-    `Homqero Rentals USA - Rental Prescreening Portal`,
-    `https://homesoqure.web.app`,
   ];
 
   const body = lines.join("\n");
@@ -461,9 +457,6 @@ export function buildApplicationEmailUrls(
     `LANDLORD ACTION CHECKLIST`,
     `--------------------------------------------------`,
     ...analysis.recommendations.slice(0, 3).map((r, i) => `${i + 1}. ${r}`),
-    ``,
-    `Landlord Portal: https://homesoqure.web.app/admin`,
-    `Homqero Rentals USA - Prescreening Portal`,
   ].filter(line => line !== undefined);
 
   const mobileBody = mobileLines.join("\n");
