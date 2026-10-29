@@ -28,6 +28,7 @@ import {
   Sparkles,
   Phone,
   PhoneCall,
+  Calendar,
 } from "lucide-react";
 import {
   getProperties,
@@ -109,8 +110,12 @@ function AdminPage() {
   const [settingsSupportPhone, setSettingsSupportPhone] = useState(DEFAULT_SETTINGS.supportPhone);
   const [settingsSupportEmail, setSettingsSupportEmail] = useState(DEFAULT_SETTINGS.supportEmail);
   const [settingsLandlordName, setSettingsLandlordName] = useState(DEFAULT_SETTINGS.landlordName || "");
+  const [settingsCreditCheckUrl, setSettingsCreditCheckUrl] = useState(DEFAULT_SETTINGS.creditCheckUrl || "");
   const [settingsSaveMsg, setSettingsSaveMsg] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Submissions search & filter state
+  const [submissionDateFilter, setSubmissionDateFilter] = useState("");
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -152,6 +157,7 @@ function AdminPage() {
       setSettingsSupportPhone(s.supportPhone);
       setSettingsSupportEmail(s.supportEmail);
       setSettingsLandlordName(s.landlordName || "");
+      setSettingsCreditCheckUrl(s.creditCheckUrl || "");
 
       fetchSiteSettingsFromCloud().then((cloudSettings) => {
         if (cloudSettings) {
@@ -159,6 +165,7 @@ function AdminPage() {
           setSettingsSupportPhone(cloudSettings.supportPhone);
           setSettingsSupportEmail(cloudSettings.supportEmail);
           setSettingsLandlordName(cloudSettings.landlordName || "");
+          setSettingsCreditCheckUrl(cloudSettings.creditCheckUrl || "");
         }
       });
     }
@@ -334,9 +341,10 @@ function AdminPage() {
         supportPhone: settingsSupportPhone.trim(),
         supportEmail: settingsSupportEmail.trim(),
         landlordName: settingsLandlordName.trim(),
+        creditCheckUrl: settingsCreditCheckUrl.trim(),
       });
       setSiteSettings(updated);
-      setSettingsSaveMsg("✓ Support email and phone number updated successfully!");
+      setSettingsSaveMsg("✓ Support phone, email, and custom credit check link updated successfully!");
       setTimeout(() => setSettingsSaveMsg(""), 4000);
     } catch {
       setSettingsSaveMsg("Error saving settings. Please try again.");
@@ -377,8 +385,16 @@ function AdminPage() {
   const unreadChatsCount = chatThreads.reduce((sum, t) => sum + (t.unreadAdminCount > 0 ? 1 : 0), 0);
 
   const filteredSubmissions = submissions.filter((s) => {
-    if (submissionFilter === "all") return true;
-    return s.status === submissionFilter;
+    if (submissionFilter !== "all" && s.status !== submissionFilter) {
+      return false;
+    }
+    if (submissionDateFilter) {
+      const subDate = (s.submittedAt || s.lastUpdated || "").split("T")[0];
+      if (subDate !== submissionDateFilter) {
+        return false;
+      }
+    }
+    return true;
   });
 
   // -------------------------------------------------------------
@@ -1114,60 +1130,106 @@ function AdminPage() {
                   </p>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex flex-wrap items-center gap-1.5 bg-secondary/60 p-1 rounded-lg border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setSubmissionFilter("all")}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                      submissionFilter === "all"
-                        ? "bg-card text-foreground shadow-2xs font-bold"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    All ({submissions.length})
-                  </button>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Search Submissions by Date */}
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs shadow-2xs">
+                    <label htmlFor="admin-date-filter" className="flex items-center gap-1.5 font-bold text-muted-foreground whitespace-nowrap">
+                      <Calendar className="h-3.5 w-3.5 text-primary" />
+                      <span>Search Date:</span>
+                    </label>
+                    <input
+                      id="admin-date-filter"
+                      type="date"
+                      value={submissionDateFilter}
+                      onChange={(e) => setSubmissionDateFilter(e.target.value)}
+                      className="bg-transparent font-medium text-foreground text-xs focus:outline-none cursor-pointer"
+                    />
+                    {submissionDateFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setSubmissionDateFilter("")}
+                        className="rounded-full hover:bg-secondary p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Clear date filter"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setSubmissionFilter("incomplete")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                      submissionFilter === "incomplete"
-                        ? "bg-orange-500/15 text-orange-700 dark:text-orange-300 shadow-2xs font-bold"
-                        : "text-muted-foreground hover:text-orange-600"
-                    }`}
-                  >
-                    <AlertCircle className="h-3 w-3 text-orange-500" />
-                    <span>Incomplete ({incompleteCount})</span>
-                  </button>
+                  {/* Filter Tabs */}
+                  <div className="flex flex-wrap items-center gap-1.5 bg-secondary/60 p-1 rounded-lg border border-border">
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionFilter("all")}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        submissionFilter === "all"
+                          ? "bg-card text-foreground shadow-2xs font-bold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      All ({submissions.length})
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSubmissionFilter("pending_credit")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                      submissionFilter === "pending_credit"
-                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 shadow-2xs font-bold"
-                        : "text-muted-foreground hover:text-amber-600"
-                    }`}
-                  >
-                    <Clock className="h-3 w-3 text-amber-500" />
-                    <span>Pending ({pendingCount})</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionFilter("incomplete")}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        submissionFilter === "incomplete"
+                          ? "bg-orange-500/15 text-orange-700 dark:text-orange-300 shadow-2xs font-bold"
+                          : "text-muted-foreground hover:text-orange-600"
+                      }`}
+                    >
+                      <AlertCircle className="h-3 w-3 text-orange-500" />
+                      <span>Incomplete ({incompleteCount})</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSubmissionFilter("completed")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                      submissionFilter === "completed"
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold"
-                        : "text-muted-foreground hover:text-emerald-600"
-                    }`}
-                  >
-                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                    <span>Completed ({completedCount})</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionFilter("pending_credit")}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        submissionFilter === "pending_credit"
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 shadow-2xs font-bold"
+                          : "text-muted-foreground hover:text-amber-600"
+                      }`}
+                    >
+                      <Clock className="h-3 w-3 text-amber-500" />
+                      <span>Pending ({pendingCount})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionFilter("completed")}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        submissionFilter === "completed"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold"
+                          : "text-muted-foreground hover:text-emerald-600"
+                      }`}
+                    >
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      <span>Completed ({completedCount})</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {submissionDateFilter && (
+                <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-secondary/50 px-4 py-2 text-xs animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <span>
+                      Filtering submissions for date: <strong className="text-foreground">{submissionDateFilter}</strong> (
+                      <span className="font-semibold text-primary">{filteredSubmissions.length} found</span>)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSubmissionDateFilter("")}
+                    className="text-primary hover:underline font-bold cursor-pointer"
+                  >
+                    Clear Date Filter
+                  </button>
+                </div>
+              )}
 
               {filteredSubmissions.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
@@ -1295,7 +1357,7 @@ function AdminPage() {
                           <div className="rounded-lg bg-secondary/50 p-2.5 border border-border/40">
                             <span className="text-muted-foreground block text-[0.68rem]">Occupants &amp; Pets</span>
                             <span className="font-semibold text-foreground">
-                              {sub.people || 1} Person(s) · {sub.hasPets ? (sub.petDetails ? `Pets (${sub.petDetails})` : "Has Pets") : "No Pets"}
+                              {sub.adults !== undefined ? `${sub.adults} Adult(s), ${sub.children || 0} Child(ren)` : `${sub.people || 1} Person(s)`} · {sub.hasPets ? (sub.petDetails ? `Pets (${sub.petDetails})` : "Has Pets") : "No Pets"}
                             </span>
                           </div>
                         </div>
@@ -1329,11 +1391,13 @@ function AdminPage() {
 
                             {sub.wantsShowing && (
                               <span>
-                                Showing:{" "}
+                                Viewing:{" "}
                                 <strong className="text-foreground">
                                   {sub.showingTypes && sub.showingTypes.length > 0
                                     ? sub.showingTypes.join(", ")
                                     : "Yes"}
+                                  {sub.viewingDate ? ` · ${sub.viewingDate}` : ""}
+                                  {sub.viewingTime ? ` @ ${sub.viewingTime}` : ""}
                                 </strong>
                               </span>
                             )}
@@ -1731,6 +1795,24 @@ function AdminPage() {
                     />
                   </div>
 
+                  {/* Custom Credit Check Link (Affiliate / Provider URL) */}
+                  <div>
+                    <label className="block text-xs font-bold text-foreground mb-1.5 flex items-center gap-1.5">
+                      <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                      Custom Credit Check Link (Optional Affiliate / Provider Link)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://www.myscoreiq.com or your affiliate URL"
+                      value={settingsCreditCheckUrl}
+                      onChange={(e) => setSettingsCreditCheckUrl(e.target.value)}
+                      className="spa-field font-medium text-sm"
+                    />
+                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                      Applies globally to the credit score check button on step 2 across all rental listings. Leave blank or use default for standard link.
+                    </p>
+                  </div>
+
                   {settingsSaveMsg && (
                     <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -1778,7 +1860,16 @@ function AdminPage() {
                     </span>
                     <div className="space-y-1 font-mono text-[0.75rem] text-muted-foreground">
                       <p>To: <strong className="text-foreground">{settingsSupportEmail || "landlord@homqero.com"}</strong></p>
-                      <p>Subject: <span className="text-foreground">[Rental Application &amp; Deep Analysis] 406 SE Railroad St - John Doe</span></p>
+                      <p>Subject: <span className="text-foreground">[Rental Application] 406 SE Railroad St - John Doe</span></p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                      Custom Credit Check Link Preview
+                    </span>
+                    <div className="space-y-1 font-mono text-[0.75rem] text-muted-foreground">
+                      <p>Active URL: <span className="text-foreground break-all">{settingsCreditCheckUrl || DEFAULT_SETTINGS.creditCheckUrl || "https://www.myscoreiq.com"}</span></p>
                     </div>
                   </div>
                 </div>

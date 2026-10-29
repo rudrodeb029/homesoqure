@@ -17,6 +17,7 @@ export interface SiteSettings {
   supportPhone: string;
   supportEmail: string;
   landlordName?: string;
+  creditCheckUrl?: string;
   lastUpdated?: string;
 }
 
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   supportPhone: "+1 (646) 431-3060",
   supportEmail: "landlord@homqero.com",
   landlordName: "Homqero Rentals Management",
+  creditCheckUrl: "https://www.myscoreiq.com",
 };
 
 const SETTINGS_KEY = "homqero_site_settings_v1";
@@ -43,11 +45,15 @@ export interface Submission {
   creditRange: string;
   moveInDate: string;
   people: number;
+  adults?: number;
+  children?: number;
   hasPets: boolean;
   petDetails?: string;
   smoking: string;
   wantsShowing: boolean;
   showingTypes?: string[];
+  viewingDate?: string;
+  viewingTime?: string;
   source: string;
   questions?: string;
   screenshotName?: string;
@@ -109,6 +115,7 @@ export function getSiteSettings(): SiteSettings {
       supportPhone: parsed.supportPhone || DEFAULT_SETTINGS.supportPhone,
       supportEmail: parsed.supportEmail || DEFAULT_SETTINGS.supportEmail,
       landlordName: parsed.landlordName || DEFAULT_SETTINGS.landlordName,
+      creditCheckUrl: parsed.creditCheckUrl || DEFAULT_SETTINGS.creditCheckUrl,
       lastUpdated: parsed.lastUpdated,
     };
   } catch {
@@ -151,6 +158,7 @@ export async function fetchSiteSettingsFromCloud(): Promise<SiteSettings> {
         supportPhone: data.supportPhone || DEFAULT_SETTINGS.supportPhone,
         supportEmail: data.supportEmail || DEFAULT_SETTINGS.supportEmail,
         landlordName: data.landlordName || DEFAULT_SETTINGS.landlordName,
+        creditCheckUrl: data.creditCheckUrl || DEFAULT_SETTINGS.creditCheckUrl,
         lastUpdated: data.lastUpdated,
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
@@ -343,11 +351,15 @@ export function saveOrUpdateDraftLead(draft: Partial<Submission>): Submission | 
       creditRange: draft.creditRange || "",
       moveInDate: draft.moveInDate || "",
       people: draft.people || 1,
+      adults: draft.adults !== undefined ? draft.adults : 1,
+      children: draft.children !== undefined ? draft.children : 0,
       hasPets: !!draft.hasPets,
       petDetails: draft.petDetails || "",
       smoking: draft.smoking || "",
       wantsShowing: !!draft.wantsShowing,
       showingTypes: draft.showingTypes || [],
+      viewingDate: draft.viewingDate || "",
+      viewingTime: draft.viewingTime || "",
       source: draft.source || "",
       questions: draft.questions || "",
       screenshotName: draft.screenshotName || "",

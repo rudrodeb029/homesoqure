@@ -6,6 +6,7 @@ import {
   getPropertyById,
   markSubmissionCompleted,
   getLatestSubmission,
+  getSiteSettings,
   type Property,
   type Submission,
   DEFAULT_PROPERTY,
@@ -15,10 +16,10 @@ import { dispatchApplicationEmail, openGmailInstantly } from "@/lib/deep-analysi
 export const Route = createFileRoute("/success")({
   head: () => ({
     meta: [
-      { title: "Complete Your Free Credit Score · Homqero Rentals USA" },
-      { name: "description", content: "Check your credit score for free and upload a screenshot so the landlord can verify it." },
-      { property: "og:title", content: "Complete Your Free Credit Score · Homqero Rentals USA" },
-      { property: "og:description", content: "Free credit score check for your rental application — no impact on your score." },
+      { title: "Complete Your $1 Credit Score Trial · Homqero Rentals USA" },
+      { name: "description", content: "Check your credit score with a $1 trial and upload a screenshot so the landlord can verify it." },
+      { property: "og:title", content: "Complete Your $1 Credit Score Trial · Homqero Rentals USA" },
+      { property: "og:description", content: "$1 credit score trial for your rental application — no impact on your score." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/success")({
 });
 
 const steps = [
-  "Open the free credit check below and sign up or sign in.",
+  "Open the $1 credit check trial below and sign up or sign in.",
   "Once your score appears, take a screenshot of that page.",
   "Upload the screenshot here so the landlord can verify your score.",
 ];
@@ -78,12 +79,23 @@ function Success() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadContainerRef = useRef<HTMLDivElement>(null);
+  const [settings, setSettings] = useState(getSiteSettings());
   const [property, setProperty] = useState<Property>(DEFAULT_PROPERTY);
   const [fileName, setFileName] = useState("");
   const [fileDataUrl, setFileDataUrl] = useState("");
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  useEffect(() => {
+    setSettings(getSiteSettings());
+    const onSettings = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) setSettings(customEvent.detail);
+    };
+    window.addEventListener("homqero_settings_updated", onSettings);
+    return () => window.removeEventListener("homqero_settings_updated", onSettings);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -189,10 +201,10 @@ function Success() {
         </div>
 
         <h1 className="font-serif text-4xl font-bold text-foreground">
-          Complete your free credit score
+          Complete your $1 credit score trial
         </h1>
         <p className="mt-3 text-sm text-muted-foreground font-medium">
-          Landlords ask for a recent credit score before approving an application. Checking it below is free and will not affect your score.
+          Landlords ask for a recent credit score before approving an application. Checking it below is available with a $1 trial and will not affect your score.
         </p>
 
         <ol className="mt-8 space-y-5">
@@ -206,20 +218,29 @@ function Success() {
           ))}
         </ol>
 
-        <a
-          href={property.creditCheckUrl || "#"}
-          target={property.creditCheckUrl && property.creditCheckUrl !== "#" ? "_blank" : undefined}
-          rel="noopener noreferrer"
-          className="mt-8 flex items-center justify-between gap-4 rounded-lg bg-espresso p-5 text-primary-foreground transition hover:opacity-95"
-        >
-          <span>
-            <span className="block font-serif text-xl font-bold text-accent">Check your credit score — free</span>
-            <span className="mt-1 block text-sm text-primary-foreground/80 font-medium">
-              Opens in a new tab · takes about 2 minutes · no impact on your score
-            </span>
-          </span>
-          <ArrowRight className="h-5 w-5 shrink-0 text-accent" />
-        </a>
+        {(() => {
+          const targetCreditUrl =
+            (property.creditCheckUrl && property.creditCheckUrl !== "#" ? property.creditCheckUrl : null) ||
+            (settings.creditCheckUrl && settings.creditCheckUrl !== "#" ? settings.creditCheckUrl : null) ||
+            "https://www.myscoreiq.com";
+
+          return (
+            <a
+              href={targetCreditUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-8 flex items-center justify-between gap-4 rounded-lg bg-espresso p-5 text-primary-foreground transition hover:opacity-95 cursor-pointer shadow-md"
+            >
+              <span>
+                <span className="block font-serif text-xl font-bold text-accent">Check your credit score — $1 trial</span>
+                <span className="mt-1 block text-sm text-primary-foreground/80 font-medium">
+                  Opens in a new tab · 7-day trial for only $1 · will not lower your score
+                </span>
+              </span>
+              <ArrowRight className="h-5 w-5 shrink-0 text-accent" />
+            </a>
+          );
+        })()}
 
         {/* Screenshot Upload Container */}
         <div

@@ -101,6 +101,8 @@ function Index() {
   const [creditRange, setCreditRange] = useState("");
   const [moveInDate, setMoveInDate] = useState("");
   const [people, setPeople] = useState(1);
+  const [adults, setAdults] = useState(1);
+  const [childrenCount, setChildrenCount] = useState(0);
   const [hasPets, setHasPets] = useState(false);
   const [petOptionChosen, setPetOptionChosen] = useState(false);
   const [petDetails, setPetDetails] = useState("");
@@ -108,6 +110,8 @@ function Index() {
   const [wantsShowing, setWantsShowing] = useState(false);
   const [showingOptionChosen, setShowingOptionChosen] = useState(false);
   const [showingTypes, setShowingTypes] = useState<string[]>([]);
+  const [viewingDate, setViewingDate] = useState("");
+  const [viewingTime, setViewingTime] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -145,11 +149,15 @@ function Index() {
       creditRange,
       moveInDate,
       people,
+      adults,
+      children: childrenCount,
       hasPets,
       petDetails,
       smoking,
       wantsShowing,
       showingTypes,
+      viewingDate,
+      viewingTime,
       source,
       questions,
       status: "incomplete",
@@ -174,11 +182,15 @@ function Index() {
     creditRange,
     moveInDate,
     people,
+    adults,
+    childrenCount,
     hasPets,
     petDetails,
     smoking,
     wantsShowing,
     showingTypes,
+    viewingDate,
+    viewingTime,
     source,
     questions,
   ]);
@@ -231,6 +243,9 @@ function Index() {
     if (!moveInDate) {
       newErrors.moveInDate = "Please choose your desired move-in date.";
     }
+    if (adults + childrenCount < 1) {
+      newErrors.people = "Please specify at least one adult or child living at this rental.";
+    }
     if (!petOptionChosen) {
       newErrors.pets = "Please select whether you have pets.";
     } else if (hasPets && !petDetails.trim()) {
@@ -240,9 +255,17 @@ function Index() {
       newErrors.smoking = "Please select your smoking status.";
     }
     if (!showingOptionChosen) {
-      newErrors.showing = "Please select whether you are interested in a showing.";
-    } else if (wantsShowing && showingTypes.length === 0) {
-      newErrors.showingTypes = "Please select at least one showing preference.";
+      newErrors.showing = "Please select whether you are interested in a viewing.";
+    } else if (wantsShowing) {
+      if (showingTypes.length === 0) {
+        newErrors.showingTypes = "Please select at least one viewing preference.";
+      }
+      if (!viewingDate) {
+        newErrors.viewingDate = "Please select a preferred viewing date.";
+      }
+      if (!viewingTime) {
+        newErrors.viewingTime = "Please select a preferred viewing time.";
+      }
     }
 
     // 3. Contact Details
@@ -304,11 +327,15 @@ function Index() {
       creditRange,
       moveInDate,
       people,
+      adults,
+      children: childrenCount,
       hasPets,
       petDetails,
       smoking,
       wantsShowing,
       showingTypes,
+      viewingDate,
+      viewingTime,
       source,
       questions,
       status: "pending_credit" as const,
@@ -463,30 +490,122 @@ function Index() {
             />
           </Q>
 
-          <div className="flex items-center justify-between gap-4">
-            <Q label="How many people would live at this rental?" hint="Make sure to include yourself." />
-            <div className="flex shrink-0 items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label="Remove one person"
-                onClick={() => setPeople(Math.max(1, people - 1))}
-                className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer"
-              >
-                <Minus />
-              </Button>
-              <span className="w-8 text-center font-bold text-base">{people}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label="Add one person"
-                onClick={() => setPeople(people + 1)}
-                className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer"
-              >
-                <Plus />
-              </Button>
+          <div id="q-people" className="space-y-3">
+            <div>
+              <p className="text-sm font-bold text-foreground">
+                How many people would live at this rental? <span className="text-red-600 dark:text-red-400">*</span>
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground font-medium">
+                Make sure to include yourself. Specify adults and children below.
+              </p>
+              {errors.people && (
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 animate-in fade-in duration-200">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.people}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* Adults counter */}
+              <div className={`flex items-center justify-between rounded-lg border p-3 shadow-2xs transition-colors ${
+                errors.people ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/20" : "border-border bg-card"
+              }`}>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Adults</p>
+                  <p className="text-[0.7rem] text-muted-foreground font-medium">Age 18+</p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Remove one adult"
+                    onClick={() => {
+                      const next = Math.max(0, adults - 1);
+                      setAdults(next);
+                      setPeople(next + childrenCount);
+                      if (errors.people && next + childrenCount >= 1) {
+                        setErrors((errs) => ({ ...errs, people: "" }));
+                      }
+                      syncDraft({ adults: next, people: next + childrenCount });
+                    }}
+                    disabled={adults <= 0}
+                    className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer disabled:opacity-40"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="w-6 text-center font-bold text-base text-foreground">{adults}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Add one adult"
+                    onClick={() => {
+                      const next = adults + 1;
+                      setAdults(next);
+                      setPeople(next + childrenCount);
+                      if (errors.people) {
+                        setErrors((errs) => ({ ...errs, people: "" }));
+                      }
+                      syncDraft({ adults: next, people: next + childrenCount });
+                    }}
+                    className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Children counter */}
+              <div className={`flex items-center justify-between rounded-lg border p-3 shadow-2xs transition-colors ${
+                errors.people ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/20" : "border-border bg-card"
+              }`}>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Children</p>
+                  <p className="text-[0.7rem] text-muted-foreground font-medium">Under 18</p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Remove one child"
+                    onClick={() => {
+                      const next = Math.max(0, childrenCount - 1);
+                      setChildrenCount(next);
+                      setPeople(adults + next);
+                      if (errors.people && adults + next >= 1) {
+                        setErrors((errs) => ({ ...errs, people: "" }));
+                      }
+                      syncDraft({ children: next, people: adults + next });
+                    }}
+                    disabled={childrenCount <= 0}
+                    className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer disabled:opacity-40"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="w-6 text-center font-bold text-base text-foreground">{childrenCount}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Add one child"
+                    onClick={() => {
+                      const next = childrenCount + 1;
+                      setChildrenCount(next);
+                      setPeople(adults + next);
+                      if (errors.people) {
+                        setErrors((errs) => ({ ...errs, people: "" }));
+                      }
+                      syncDraft({ children: next, people: adults + next });
+                    }}
+                    className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -569,10 +688,10 @@ function Index() {
 
           <Q
             id="q-showing"
-            label="Would you be interested in a showing?"
+            label="Would you be interested in a viewing?"
             hint="See if the landlord will show the rental by video (FaceTime, Zoom, etc.) or in person."
             required
-            error={errors.showing || errors.showingTypes}
+            error={errors.showing || errors.showingTypes || errors.viewingDate || errors.viewingTime}
           >
             <div id="field-showing" className="flex flex-wrap gap-x-6 gap-y-2">
               {["Yes", "No"].map((option) => (
@@ -595,33 +714,88 @@ function Index() {
             </div>
 
             {wantsShowing && (
-              <fieldset id="field-showingTypes" className="mt-4 space-y-3">
-                <legend className="mb-2 text-sm font-bold text-foreground">
-                  Your preferred showing type: <span className="text-red-600 dark:text-red-400">*</span>
-                </legend>
-                <label className="flex items-start gap-2 text-sm font-medium cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="showingType"
-                    value="in-person"
-                    checked={showingTypes.includes("in-person")}
-                    onChange={() => handleToggleShowingType("in-person")}
-                    className="mt-1 accent-primary h-4 w-4 rounded"
-                  />
-                  <span>In-person showing</span>
-                </label>
-                <label className="flex items-start gap-2 text-sm font-medium cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="showingType"
-                    value="virtual"
-                    checked={showingTypes.includes("virtual")}
-                    onChange={() => handleToggleShowingType("virtual")}
-                    className="mt-1 accent-primary h-4 w-4 rounded"
-                  />
-                  <span>Virtual showing (FaceTime, Zoom, etc.)</span>
-                </label>
-              </fieldset>
+              <div className="mt-4 space-y-4 rounded-lg border border-border/70 bg-secondary/30 p-4">
+                <fieldset id="field-showingTypes" className="space-y-2">
+                  <legend className="text-sm font-bold text-foreground">
+                    Preferred viewing type: <span className="text-red-600 dark:text-red-400">*</span>
+                  </legend>
+                  {errors.showingTypes && (
+                    <p className="text-xs text-red-600 dark:text-red-400 font-semibold">{errors.showingTypes}</p>
+                  )}
+                  <div className="flex flex-wrap gap-4 pt-1">
+                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="showingType"
+                        value="in-person"
+                        checked={showingTypes.includes("in-person")}
+                        onChange={() => handleToggleShowingType("in-person")}
+                        className="accent-primary h-4 w-4 rounded"
+                      />
+                      <span>In-person viewing</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="showingType"
+                        value="virtual"
+                        checked={showingTypes.includes("virtual")}
+                        onChange={() => handleToggleShowingType("virtual")}
+                        className="accent-primary h-4 w-4 rounded"
+                      />
+                      <span>Virtual viewing (FaceTime, Zoom, etc.)</span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                {/* Preferred Date & Time Selection */}
+                <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="field-viewingDate" className="block text-xs font-bold text-foreground mb-1">
+                      Preferred viewing date <span className="text-red-600 dark:text-red-400">*</span>
+                    </label>
+                    <input
+                      id="field-viewingDate"
+                      type="date"
+                      min={new Date().toISOString().split("T")[0]}
+                      value={viewingDate}
+                      onChange={(e) => {
+                        setViewingDate(e.target.value);
+                        if (errors.viewingDate) setErrors((errs) => ({ ...errs, viewingDate: "" }));
+                        syncDraft({ viewingDate: e.target.value });
+                      }}
+                      className={`spa-field w-full text-xs font-medium ${
+                        errors.viewingDate ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                      }`}
+                    />
+                    {errors.viewingDate && (
+                      <p className="mt-1 text-[0.7rem] text-red-600 dark:text-red-400 font-medium">{errors.viewingDate}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="field-viewingTime" className="block text-xs font-bold text-foreground mb-1">
+                      Preferred viewing time <span className="text-red-600 dark:text-red-400">*</span>
+                    </label>
+                    <input
+                      id="field-viewingTime"
+                      type="time"
+                      value={viewingTime}
+                      onChange={(e) => {
+                        setViewingTime(e.target.value);
+                        if (errors.viewingTime) setErrors((errs) => ({ ...errs, viewingTime: "" }));
+                        syncDraft({ viewingTime: e.target.value });
+                      }}
+                      className={`spa-field w-full text-xs font-medium ${
+                        errors.viewingTime ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                      }`}
+                    />
+                    {errors.viewingTime && (
+                      <p className="mt-1 text-[0.7rem] text-red-600 dark:text-red-400 font-medium">{errors.viewingTime}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </Q>
         </Section>

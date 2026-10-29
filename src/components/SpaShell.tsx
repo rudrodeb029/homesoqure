@@ -35,7 +35,7 @@ export function SpaShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="bg-espresso py-2 text-center text-xs tracking-wide text-primary-foreground font-medium">
-        Free credit score check with every rental application · <span className="font-bold text-accent">All 50 states</span>
+        $1 credit score check trial with every rental application · <span className="font-bold text-accent">All 50 states</span>
       </div>
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">

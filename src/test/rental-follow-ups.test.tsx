@@ -35,16 +35,16 @@ describe("Rental follow-up rules", () => {
 
   it("shows independently selectable showing types only when showing is Yes", () => {
     render(<Index />);
-    expect(screen.queryByRole("checkbox", { name: "In-person showing" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /In-person/i })).toBeNull();
     choose("show", "Yes");
-    const inPerson = screen.getByRole("checkbox", { name: "In-person showing" });
-    const virtual = screen.getByRole("checkbox", { name: "Virtual showing (FaceTime, Zoom, etc.)" });
+    const inPerson = screen.getByRole("checkbox", { name: /In-person/i });
+    const virtual = screen.getByRole("checkbox", { name: /Virtual/i });
     fireEvent.click(inPerson);
     fireEvent.click(virtual);
     expect(inPerson).toBeChecked();
     expect(virtual).toBeChecked();
     choose("show", "No");
-    expect(screen.queryByRole("checkbox", { name: "In-person showing" })).toBeNull();
-    expect(screen.queryByRole("checkbox", { name: "Virtual showing (FaceTime, Zoom, etc.)" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /In-person/i })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /Virtual/i })).toBeNull();
   });
 });

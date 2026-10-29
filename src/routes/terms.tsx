@@ -68,9 +68,9 @@ function TermsPage() {
 
         {/* Credit Score Checking */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-xs space-y-3">
-          <h2 className="font-serif text-xl font-bold text-foreground">3. Free Credit Score Check Protocol</h2>
+          <h2 className="font-serif text-xl font-bold text-foreground">3. $1 Credit Score Check Trial Protocol</h2>
           <p className="text-xs leading-relaxed text-foreground/90 font-medium">
-            Homqero facilitates convenient links to free, soft-pull consumer credit reporting resources. Utilizing these third-party consumer tools does not adversely affect your credit score. Homqero does not generate consumer credit reports directly and does not charge applicants fees for credit score verification.
+            Homqero facilitates convenient links to affordable $1 consumer credit reporting trial tools. Utilizing these third-party consumer reporting resources does not adversely affect your credit score. Homqero does not generate consumer credit reports directly and does not charge applicants fees for credit score verification.
           </p>
         </div>
 

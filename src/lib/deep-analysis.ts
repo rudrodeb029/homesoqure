@@ -165,59 +165,56 @@ export function generateApplicationEmail(
   text: string;
   html: string;
 } {
-  const analysis = analyzeTenantApplication(submission, property);
   const applicantName = `${submission.firstName || "New"} ${submission.lastName || "Applicant"}`.trim();
   const phone = submission.phone || "Not provided";
   const email = submission.email || "Not provided";
   const rent = property.price ? `$${property.price}/month` : "Standard Rent";
+  const adults = submission.adults !== undefined ? submission.adults : (submission.people || 1);
+  const children = submission.children !== undefined ? submission.children : 0;
+  const totalOccupants = adults + children;
 
-  const subject = `🏠 [New Rental Application] ${property.address} — ${applicantName} (${analysis.overallVerdict} · ${analysis.incomeMultiplier}x Rent)`;
+  const subject = `🏠 [New Rental Application] ${property.address} — ${applicantName}`;
 
   const text = `
-HOMQERO RENTALS USA — NEW TENANT APPLICATION & DEEP ANALYSIS
+HOMQERO RENTALS USA — RENTAL APPLICATION
 ================================================================================
 Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}
 Monthly Rent: ${rent}
-Applicant: ${applicantName}
-Phone (USA): ${phone}
-Email: ${email}
-Submission ID: ${submission.id || "HQ-ONLINE"}
-Date: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
 
-EXECUTIVE SUMMARY
+APPLICANT INFORMATION
 --------------------------------------------------------------------------------
-Overall Verdict: ${analysis.overallVerdict} (Score: ${analysis.overallScore}/100)
-${analysis.executiveSummary}
+• Full Name: ${applicantName}
+• Phone (USA): ${phone}
+• Email: ${email}
 
-FINANCIAL & CREDIT DEEP ANALYSIS
---------------------------------------------------------------------------------
-• Household Monthly Income: $${submission.income || 0}
-• Rent-to-Income Multiple: ${analysis.incomeMultiplier}x
-• Income Assessment: ${analysis.incomeAssessment}
-• Estimated Credit Score: ${submission.creditRange || "Not specified"} (${analysis.creditTier})
-• Credit Risk: ${analysis.creditRisk.toUpperCase()}
-• Credit Assessment: ${analysis.creditAssessment}
-
-MOVE-IN & HOUSEHOLD DETAILS
+HOUSEHOLD & OCCUPANCY
 --------------------------------------------------------------------------------
 • Desired Move-in Date: ${submission.moveInDate || "Immediate"}
-• Number of Occupants: ${submission.people || 1} (${analysis.occupancyAssessment})
-• Pets: ${submission.hasPets ? "YES" : "NO"} (${analysis.petAssessment})
-• Smoking: ${submission.smoking || "None"} (${analysis.smokingAssessment})
-• Showing Request: ${analysis.showingAssessment}
+• Occupants: ${totalOccupants} total (${adults} Adult${adults !== 1 ? "s" : ""}, ${children} Child${children !== 1 ? "ren" : ""})
+• Pets: ${submission.hasPets ? "YES - " + (submission.petDetails || "Present") : "None"}
+• Smoking: ${submission.smoking || "None"}
+
+EMPLOYMENT & FINANCIALS
+--------------------------------------------------------------------------------
+• Monthly Household Income: $${submission.income || 0}
+• Estimated Credit Score: ${submission.creditRange || "Not specified"}
+• Credit Verification Screenshot: ${submission.screenshotName ? `${submission.screenshotName} (Uploaded on portal)` : "Pending tenant upload"}
+
+VIEWING PREFERENCE
+--------------------------------------------------------------------------------
+• Interested in Viewing: ${submission.wantsShowing ? "Yes" : "No"}
+${submission.wantsShowing ? `• Preferred Viewing Type: ${submission.showingTypes?.join(", ") || "In-person"}` : ""}
+${submission.wantsShowing && submission.viewingDate ? `• Preferred Date: ${submission.viewingDate}` : ""}
+${submission.wantsShowing && submission.viewingTime ? `• Preferred Time: ${submission.viewingTime}` : ""}
+
+ADDITIONAL DETAILS
+--------------------------------------------------------------------------------
 • Referral Source: ${submission.source || "Website Direct"}
-• Questions for Landlord: ${submission.questions || "None provided"}
-
-CREDIT VERIFICATION SCREENSHOT
---------------------------------------------------------------------------------
-Screenshot File: ${submission.screenshotName || "Attached in Admin Portal"}
-${submission.screenshotUrl ? "Screenshot available in Admin Dashboard." : "Pending tenant upload."}
-
-LANDLORD RECOMMENDATIONS & ACTION CHECKLIST
---------------------------------------------------------------------------------
-${analysis.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
+${submission.questions ? `• Questions for Landlord: ${submission.questions}` : ""}
 
 ================================================================================
+Confirmation ID: ${submission.id || "HQ-ONLINE"}
+Date Submitted: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
 `.trim();
 
   const html = `
@@ -231,84 +228,60 @@ ${analysis.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
     .header { background: #26170f; color: #fbf9f5; padding: 24px; }
     .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
     .header p { margin: 6px 0 0; font-size: 13px; color: #d4a373; text-transform: uppercase; letter-spacing: 1px; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    .badge-strong { background: #d1fae5; color: #065f46; }
-    .badge-good { background: #dbeafe; color: #1e40af; }
-    .badge-review { background: #fef3c7; color: #92400e; }
     .content { padding: 24px; }
-    .section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #643c23; border-bottom: 1px solid #f0e9df; padding-bottom: 6px; margin-top: 24px; margin-bottom: 12px; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #643c23; border-bottom: 1px solid #f0e9df; padding-bottom: 6px; margin-top: 20px; margin-bottom: 10px; }
     .grid { display: table; width: 100%; }
     .row { display: table-row; }
     .label { display: table-cell; padding: 6px 0; font-size: 13px; color: #78716c; width: 40%; font-weight: 600; }
     .value { display: table-cell; padding: 6px 0; font-size: 13px; color: #1c1917; font-weight: 700; }
-    .highlight-box { background: #faf6f0; border-left: 4px solid #643c23; padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 13px; }
-    .btn { display: inline-block; background: #643c23; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-top: 20px; }
-    .footer { background: #f5efe6; padding: 16px 24px; font-size: 11px; color: #a8a29e; text-align: center; }
+    .footer { background: #f5efe6; padding: 14px 24px; font-size: 11px; color: #a8a29e; text-align: center; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="header">
-      <h1>New Rental Application &amp; Analysis</h1>
+      <h1>New Rental Application</h1>
       <p>Target Listing: ${property.address}, ${property.city}</p>
     </div>
     <div class="content">
-      <div style="margin-bottom: 16px;">
-        <span class="badge ${analysis.overallVerdict === 'Strong Candidate' ? 'badge-strong' : analysis.overallVerdict === 'Good Candidate' ? 'badge-good' : 'badge-review'}">
-          ${analysis.overallVerdict} (Score: ${analysis.overallScore}/100)
-        </span>
-      </div>
-
-      <div class="highlight-box">
-        <strong>Executive Summary:</strong><br/>
-        ${analysis.executiveSummary}
-      </div>
-
       <div class="section-title">Applicant Contact Information</div>
       <div class="grid">
         <div class="row"><div class="label">Full Name:</div><div class="value">${applicantName}</div></div>
         <div class="row"><div class="label">USA Phone:</div><div class="value"><a href="tel:${phone}" style="color:#643c23;">${phone}</a></div></div>
         <div class="row"><div class="label">Email Address:</div><div class="value"><a href="mailto:${email}" style="color:#643c23;">${email}</a></div></div>
-        <div class="row"><div class="label">Target Property:</div><div class="value">${property.address} ($${property.price}/mo)</div></div>
-        <div class="row"><div class="label">Referral Source:</div><div class="value">${submission.source || "Website"}</div></div>
+        <div class="row"><div class="label">Target Property:</div><div class="value">${property.address} (${rent})</div></div>
       </div>
 
-      <div class="section-title">Deep Financial &amp; Risk Analysis</div>
-      <div class="grid">
-        <div class="row"><div class="label">Declared Monthly Income:</div><div class="value">$${submission.income || 0} / month</div></div>
-        <div class="row"><div class="label">Income-to-Rent Ratio:</div><div class="value">${analysis.incomeMultiplier}x rent (${analysis.rentToIncomeRatio}% of income)</div></div>
-        <div class="row"><div class="label">Income Evaluation:</div><div class="value" style="font-weight:normal; font-size:12px;">${analysis.incomeAssessment}</div></div>
-        <div class="row"><div class="label">Credit Range Declared:</div><div class="value">${submission.creditRange || "Not specified"}</div></div>
-        <div class="row"><div class="label">Credit Tier:</div><div class="value">${analysis.creditTier} (${analysis.creditRisk.toUpperCase()} RISK)</div></div>
-        <div class="row"><div class="label">Credit Evaluation:</div><div class="value" style="font-weight:normal; font-size:12px;">${analysis.creditAssessment}</div></div>
-      </div>
-
-      <div class="section-title">Lease &amp; Household Preferences</div>
+      <div class="section-title">Household &amp; Occupancy</div>
       <div class="grid">
         <div class="row"><div class="label">Desired Move-in:</div><div class="value">${submission.moveInDate || "Immediate"}</div></div>
-        <div class="row"><div class="label">Household Members:</div><div class="value">${submission.people || 1} Person(s)</div></div>
+        <div class="row"><div class="label">Occupants:</div><div class="value">${totalOccupants} total (${adults} Adult${adults !== 1 ? "s" : ""}, ${children} Child${children !== 1 ? "ren" : ""})</div></div>
         <div class="row"><div class="label">Pets:</div><div class="value">${submission.hasPets ? "Yes (" + (submission.petDetails || "details provided") + ")" : "None"}</div></div>
         <div class="row"><div class="label">Smoking:</div><div class="value">${submission.smoking || "None"}</div></div>
-        <div class="row"><div class="label">Showing Requested:</div><div class="value">${analysis.showingAssessment}</div></div>
-        ${submission.questions ? `<div class="row"><div class="label">Questions for Landlord:</div><div class="value">${submission.questions}</div></div>` : ""}
       </div>
 
-      <div class="section-title">Credit Score Screenshot Status</div>
-      <p style="font-size: 13px; color: #44403c;">
-        ${submission.screenshotName ? `✅ Screenshot Uploaded: <strong>${submission.screenshotName}</strong>` : "⏳ Pending applicant screenshot upload."}
-      </p>
-
-      <div class="section-title">Landlord Action Checklist</div>
-      <ul style="font-size: 13px; color: #44403c; padding-left: 20px;">
-        ${analysis.recommendations.map((r) => `<li style="margin-bottom: 4px;">${r}</li>`).join("")}
-      </ul>
-
-      <div style="text-align: center; margin-top: 24px;">
-        <a href="https://homesoqure.web.app/admin" class="btn">Open Landlord Admin Panel</a>
+      <div class="section-title">Employment &amp; Financials</div>
+      <div class="grid">
+        <div class="row"><div class="label">Monthly Income:</div><div class="value">$${submission.income || 0} / month</div></div>
+        <div class="row"><div class="label">Credit Range Declared:</div><div class="value">${submission.creditRange || "Not specified"}</div></div>
+        <div class="row"><div class="label">Screenshot Upload:</div><div class="value">${submission.screenshotName ? "Uploaded" : "Pending"}</div></div>
       </div>
+
+      <div class="section-title">Viewing Preference</div>
+      <div class="grid">
+        <div class="row"><div class="label">Interested in Viewing:</div><div class="value">${submission.wantsShowing ? "Yes" : "No"}</div></div>
+        ${submission.wantsShowing ? `<div class="row"><div class="label">Viewing Type:</div><div class="value">${submission.showingTypes?.join(", ") || "In-person"}</div></div>` : ""}
+        ${submission.wantsShowing && submission.viewingDate ? `<div class="row"><div class="label">Preferred Date:</div><div class="value">${submission.viewingDate}</div></div>` : ""}
+        ${submission.wantsShowing && submission.viewingTime ? `<div class="row"><div class="label">Preferred Time:</div><div class="value">${submission.viewingTime}</div></div>` : ""}
+      </div>
+
+      ${submission.questions ? `
+        <div class="section-title">Questions for Landlord</div>
+        <p style="font-size: 13px; color: #1c1917; margin: 4px 0 0;">${submission.questions}</p>
+      ` : ""}
     </div>
     <div class="footer">
-      © 2026 Homqero Rentals USA · Automated Real-time Rental Screening Engine
+      Confirmation ID: ${submission.id || "HQ-ONLINE"} · Submitted via Homqero Rentals USA
     </div>
   </div>
 </body>
@@ -359,7 +332,7 @@ export async function dispatchApplicationEmail(
 }
 
 /**
- * Builds email subject, full deep analysis body, Gmail web compose URL, and mailto URL for instant sending.
+ * Builds email subject, applicant information body, Gmail web compose URL, and mailto URL for instant sending.
  */
 export function buildApplicationEmailUrls(
   submission: Partial<Submission>,
@@ -372,97 +345,58 @@ export function buildApplicationEmailUrls(
   gmailComposeUrl: string;
   mailtoUrl: string;
 } {
-  const analysis = analyzeTenantApplication(submission, property);
   const settings = getSiteSettings();
   const targetEmail = recipientEmail || property.supportEmail || (property as any).landlordEmail || settings.supportEmail || "landlord@homqero.com";
   const applicantName = `${submission.firstName || "New"} ${submission.lastName || "Applicant"}`.trim();
   const phone = submission.phone || "Not provided";
   const email = submission.email || "Not provided";
   const rent = property.price ? `$${property.price}/month` : "Standard Rent";
+  const adults = submission.adults !== undefined ? submission.adults : (submission.people || 1);
+  const children = submission.children !== undefined ? submission.children : 0;
+  const totalOccupants = adults + children;
 
-  const subject = `[Rental Application & Deep Analysis] ${property.address} - ${applicantName} (${analysis.overallVerdict})`;
+  const subject = `[Rental Application] ${property.address} - ${applicantName}`;
 
   const lines = [
-    `HOMQERO RENTALS USA - TENANT APPLICATION & DEEP ANALYSIS`,
+    `HOMQERO RENTALS USA - TENANT APPLICATION`,
     `==================================================`,
     `Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
     `Monthly Rent: ${rent}`,
-    `Applicant: ${applicantName}`,
-    `Phone (USA): ${phone}`,
-    `Email: ${email}`,
-    `Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
-    `Date: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`,
     ``,
-    `EXECUTIVE SUMMARY`,
-    `--------------------------------------------------`,
-    `Overall Verdict: ${analysis.overallVerdict} (Score: ${analysis.overallScore}/100)`,
-    `${analysis.executiveSummary}`,
+    `APPLICANT CONTACT DETAILS:`,
+    `- Full Name: ${applicantName}`,
+    `- Phone (USA): ${phone}`,
+    `- Email: ${email}`,
     ``,
-    `FINANCIAL & CREDIT DEEP ANALYSIS`,
-    `--------------------------------------------------`,
-    `- Household Monthly Income: $${submission.income || 0}`,
-    `- Rent-to-Income Multiplier: ${analysis.incomeMultiplier}x Rent`,
-    `- Income Assessment: ${analysis.incomeAssessment}`,
-    `- Estimated Credit Score: ${submission.creditRange || "Not specified"} (${analysis.creditTier})`,
-    `- Credit Risk: ${analysis.creditRisk.toUpperCase()}`,
-    `- Credit Assessment: ${analysis.creditAssessment}`,
-    ``,
-    `MOVE-IN & OCCUPANCY DETAILS`,
-    `--------------------------------------------------`,
+    `HOUSEHOLD & OCCUPANCY:`,
     `- Desired Move-in Date: ${submission.moveInDate || "Immediate"}`,
-    `- Number of Occupants: ${submission.people || 1} (${analysis.occupancyAssessment})`,
-    `- Pets: ${submission.hasPets ? "YES - " + (submission.petDetails || "Pets declared") : "None"}`,
+    `- Total Occupants: ${totalOccupants} (${adults} Adult${adults !== 1 ? "s" : ""}, ${children} Child${children !== 1 ? "ren" : ""})`,
+    `- Pets: ${submission.hasPets ? "YES - " + (submission.petDetails || "Present") : "None"}`,
     `- Smoking: ${submission.smoking || "None"}`,
-    `- Showing Request: ${analysis.showingAssessment}`,
+    ``,
+    `EMPLOYMENT & FINANCIALS:`,
+    `- Household Monthly Income: $${submission.income || 0}`,
+    `- Estimated Credit Score: ${submission.creditRange || "Not specified"}`,
+    `- Credit Verification Screenshot: ${submission.screenshotName ? `${submission.screenshotName} (Uploaded on portal)` : "Pending upload"}`,
+    ``,
+    `VIEWING PREFERENCE:`,
+    `- Interested in Viewing: ${submission.wantsShowing ? "Yes" : "No"}`,
+    ...(submission.wantsShowing ? [`- Preferred Viewing Type: ${submission.showingTypes?.join(", ") || "In-person"}`] : []),
+    ...(submission.wantsShowing && submission.viewingDate ? [`- Preferred Date: ${submission.viewingDate}`] : []),
+    ...(submission.wantsShowing && submission.viewingTime ? [`- Preferred Time: ${submission.viewingTime}`] : []),
+    ``,
+    `ADDITIONAL DETAILS:`,
     `- Referral Source: ${submission.source || "Website Direct"}`,
-    `- Questions for Landlord: ${submission.questions || "None provided"}`,
-    ``,
-    `CREDIT VERIFICATION SCREENSHOT`,
-    `--------------------------------------------------`,
-    `Screenshot File: ${submission.screenshotName || "Uploaded on portal"}`,
-    `Verification Status: Recorded in Landlord Portal.`,
-    ``,
-    `LANDLORD RECOMMENDATIONS & ACTION CHECKLIST`,
-    `--------------------------------------------------`,
-    ...analysis.recommendations.map((r, i) => `${i + 1}. ${r}`),
+    ...(submission.questions ? [`- Questions for Landlord: ${submission.questions}`] : []),
     ``,
     `==================================================`,
+    `Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
+    `Date Submitted: ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`,
   ];
 
   const body = lines.join("\n");
-
-  const mobileLines = [
-    `HOMQERO RENTALS USA - TENANT APPLICATION & DEEP ANALYSIS`,
-    `==================================================`,
-    `Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
-    `Monthly Rent: ${rent} | Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
-    `Applicant: ${applicantName}`,
-    `Phone (USA): ${phone}`,
-    `Email: ${email}`,
-    ``,
-    `EXECUTIVE DEEP ANALYSIS`,
-    `--------------------------------------------------`,
-    `Verdict: ${analysis.overallVerdict} (Score: ${analysis.overallScore}/100)`,
-    `Rent-to-Income: ${analysis.incomeMultiplier}x Rent ($${submission.income || 0}/mo income)`,
-    `Credit Score: ${submission.creditRange || "Not specified"} (${analysis.creditTier} - ${analysis.creditRisk.toUpperCase()} Risk)`,
-    `Verification Screenshot: ${submission.screenshotName ? "Uploaded on portal" : "Pending"}`,
-    ``,
-    `MOVE-IN & OCCUPANCY DETAILS`,
-    `--------------------------------------------------`,
-    `Move-In Date: ${submission.moveInDate || "Immediate"} | Occupants: ${submission.people || 1}`,
-    `Pets: ${submission.hasPets ? "Yes (" + (submission.petDetails || "Present") + ")" : "None"} | Smoking: ${submission.smoking || "None"}`,
-    `Showing: ${analysis.showingAssessment}`,
-    submission.questions ? `Questions: ${submission.questions}` : "",
-    ``,
-    `LANDLORD ACTION CHECKLIST`,
-    `--------------------------------------------------`,
-    ...analysis.recommendations.slice(0, 3).map((r, i) => `${i + 1}. ${r}`),
-  ].filter(line => line !== undefined);
-
-  const mobileBody = mobileLines.join("\n");
-
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mobileBody)}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
   return { targetEmail, subject, body, gmailComposeUrl, mailtoUrl };
 }
