@@ -350,7 +350,7 @@ function AdminPage() {
         <div className="mx-auto w-full max-w-md px-6 py-12">
           <div className="rounded-2xl border border-border bg-card p-8 shadow-xl text-center">
             {/* Circular Emblem */}
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-border font-script text-3xl text-primary bg-secondary/60 shadow-sm ring-8 ring-primary/5">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-border font-serif font-bold text-3xl text-primary bg-secondary/60 shadow-sm ring-8 ring-primary/5">
               H
             </div>
 

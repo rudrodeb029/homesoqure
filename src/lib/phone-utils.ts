@@ -32,3 +32,4 @@ export function isValidUSPhone(value: string): boolean {
   // Standard USA phone number must be exactly 10 digits with valid area code (first digit 2-9)
   return digits.length === 10 && digits[0] >= "2";
 }
+
