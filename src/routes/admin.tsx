@@ -161,6 +161,13 @@ function AdminPage() {
       setSettingsCreditCheckUrl(s.creditCheckUrl || "");
       setSettingsChatAutoReply(s.chatAutoReply || DEFAULT_SETTINGS.chatAutoReply || "");
 
+      // Pre-fill "Post a New Rental Property" inputs from saved site settings
+      setSupportPhone(s.supportPhone || "+1 (646) 431-3060");
+      setSupportEmail(s.supportEmail || "landlord@homqero.com");
+      if (s.creditCheckUrl) {
+        setCreditCheckUrl(s.creditCheckUrl);
+      }
+
       fetchSiteSettingsFromCloud().then((cloudSettings) => {
         if (cloudSettings) {
           setSiteSettings(cloudSettings);
@@ -169,6 +176,12 @@ function AdminPage() {
           setSettingsLandlordName(cloudSettings.landlordName || "");
           setSettingsCreditCheckUrl(cloudSettings.creditCheckUrl || "");
           setSettingsChatAutoReply(cloudSettings.chatAutoReply || DEFAULT_SETTINGS.chatAutoReply || "");
+
+          setSupportPhone(cloudSettings.supportPhone || "+1 (646) 431-3060");
+          setSupportEmail(cloudSettings.supportEmail || "landlord@homqero.com");
+          if (cloudSettings.creditCheckUrl) {
+            setCreditCheckUrl(cloudSettings.creditCheckUrl);
+          }
         }
       });
     }
@@ -327,8 +340,9 @@ function AdminPage() {
     setPrice("");
     setImageUrl("");
     setImageFileName("");
-    setCreditCheckUrl("");
-    setSupportEmail(settingsSupportEmail || "landlord@homqero.com");
+    setCreditCheckUrl(settingsCreditCheckUrl || siteSettings.creditCheckUrl || "");
+    setSupportPhone(settingsSupportPhone || siteSettings.supportPhone || "+1 (646) 431-3060");
+    setSupportEmail(settingsSupportEmail || siteSettings.supportEmail || "landlord@homqero.com");
     setNotes("");
     setIsCreating(false);
     refreshData();
@@ -348,6 +362,11 @@ function AdminPage() {
         chatAutoReply: settingsChatAutoReply.trim(),
       });
       setSiteSettings(updated);
+      setSupportPhone(updated.supportPhone);
+      setSupportEmail(updated.supportEmail);
+      if (updated.creditCheckUrl) {
+        setCreditCheckUrl(updated.creditCheckUrl);
+      }
       setSettingsSaveMsg("✓ Support phone, email, and custom credit check link updated successfully!");
       setTimeout(() => setSettingsSaveMsg(""), 4000);
     } catch {
@@ -361,6 +380,21 @@ function AdminPage() {
     if (confirm("Are you sure you want to delete this property listing?")) {
       deleteProperty(id);
       refreshData();
+    }
+  };
+
+  const openCreateProperty = () => {
+    setActiveTab("properties");
+    setIsCreating(true);
+    const s = getSiteSettings();
+    if (!creditCheckUrl && (settingsCreditCheckUrl || s.creditCheckUrl)) {
+      setCreditCheckUrl(settingsCreditCheckUrl || s.creditCheckUrl || "");
+    }
+    if (!supportPhone) {
+      setSupportPhone(settingsSupportPhone || s.supportPhone || "+1 (646) 431-3060");
+    }
+    if (!supportEmail) {
+      setSupportEmail(settingsSupportEmail || s.supportEmail || "landlord@homqero.com");
     }
   };
 
@@ -600,10 +634,7 @@ function AdminPage() {
           {/* 4. Post New Property */}
           <button
             type="button"
-            onClick={() => {
-              setActiveTab("properties");
-              setIsCreating(true);
-            }}
+            onClick={openCreateProperty}
             className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
               isCreating
                 ? "bg-primary text-primary-foreground shadow-xs"
@@ -719,10 +750,7 @@ function AdminPage() {
           <div className="flex items-center gap-3">
             {!isCreating && (
               <button
-                onClick={() => {
-                  setActiveTab("properties");
-                  setIsCreating(true);
-                }}
+                onClick={openCreateProperty}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wider text-primary-foreground shadow-xs hover:bg-espresso transition cursor-pointer"
               >
                 <PlusCircle className="h-4 w-4" />
@@ -971,11 +999,14 @@ function AdminPage() {
                       Custom Credit Check Link <span className="font-normal text-muted-foreground">(Optional affiliate link)</span>
                     </label>
                     <input
-                      placeholder="https://creditcheck.example.com/ref"
+                      placeholder={settingsCreditCheckUrl || "https://creditcheck.example.com/ref"}
                       value={creditCheckUrl}
                       onChange={(e) => setCreditCheckUrl(e.target.value)}
                       className="spa-field"
                     />
+                    <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                      Auto-filled from Support Email &amp; Phone settings.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold mb-1 text-foreground">Support Contact Phone</label>
