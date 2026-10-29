@@ -29,10 +29,10 @@ export function SpaShell({ children }: { children: ReactNode }) {
         <div className="relative">{children}</div>
       </main>
       <footer className="pb-10 text-center text-xs text-muted-foreground font-medium">
-        <p className="space-x-3">
-          <a className="underline underline-offset-4" href="#">Fair Housing</a>
-          <a className="underline underline-offset-4" href="#">Privacy Policy</a>
-          <a className="underline underline-offset-4" href="#">Terms of Service</a>
+        <p className="space-x-4">
+          <Link to="/fair-housing" className="underline underline-offset-4 hover:text-foreground transition font-medium">Fair Housing</Link>
+          <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground transition font-medium">Privacy Policy</Link>
+          <Link to="/terms" className="underline underline-offset-4 hover:text-foreground transition font-medium">Terms of Service</Link>
         </p>
         <p className="mt-3 eyebrow font-bold">© 2026 Homqero Rentals USA</p>
       </footer>

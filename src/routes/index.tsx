@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
 import { SpaShell } from "@/components/SpaShell";
 import { Button } from "@/components/ui/button";
@@ -780,7 +780,7 @@ function Index() {
             Next
           </Button>
           <p className="mt-4 text-xs text-muted-foreground font-medium">
-            By sending, you agree to our <a className="underline hover:text-foreground" href="#">Terms of Use</a> &amp; <a className="underline hover:text-foreground" href="#">Privacy Policy</a>.
+            By sending, you agree to our <Link to="/terms" className="underline hover:text-foreground font-bold">Terms of Use</Link> &amp; <Link to="/privacy" className="underline hover:text-foreground font-bold">Privacy Policy</Link>.
           </p>
         </div>
       </form>
