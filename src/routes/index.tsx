@@ -100,8 +100,8 @@ function Index() {
   const [income, setIncome] = useState("");
   const [creditRange, setCreditRange] = useState("");
   const [moveInDate, setMoveInDate] = useState("");
-  const [people, setPeople] = useState(1);
-  const [adults, setAdults] = useState(1);
+  const [people, setPeople] = useState(0);
+  const [adults, setAdults] = useState(0);
   const [childrenCount, setChildrenCount] = useState(0);
   const [hasPets, setHasPets] = useState(false);
   const [petOptionChosen, setPetOptionChosen] = useState(false);
