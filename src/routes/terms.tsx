@@ -49,7 +49,7 @@ function TermsPage() {
         <div className="rounded-xl border border-border bg-card p-6 shadow-xs space-y-3">
           <h2 className="font-serif text-xl font-bold text-foreground">1. Rental Prescreening Platform</h2>
           <p className="text-xs leading-relaxed text-foreground/90 font-medium">
-            Homqero Rentals USA operates an independent digital rental prescreening portal. We provide tools for prospective tenants to share employment status, household profile, and credit verification with property managers and landlords. Homqero does not own, lease, or manage the residential listings unless expressly stated, and does not serve as a real estate brokerage.
+            Homqero Rentals USA operates an independent digital rental prescreening portal. We provide tools for prospective tenants to share employment status, household profile, and 1 dollar ($1) trial credit score verification with property managers and landlords. Homqero does not own, lease, or manage the residential listings unless expressly stated, and does not serve as a real estate brokerage.
           </p>
         </div>
 
@@ -61,16 +61,16 @@ function TermsPage() {
           </p>
           <ul className="space-y-2 text-xs font-medium text-foreground/80 pl-5 list-disc leading-relaxed">
             <li>All submitted information, including household income, occupancy count, and move-in timeline, is accurate, current, and provided in good faith.</li>
-            <li>Any uploaded credit score verification or document is genuine, unmodified, and belongs to the applicant.</li>
+            <li>Any uploaded credit score verification from the 1 dollar ($1) trial or document is genuine, unmodified, and belongs to the applicant.</li>
             <li>You authorize the participating property manager or landlord to review your submission for residential tenancy consideration.</li>
           </ul>
         </div>
 
         {/* Credit Score Checking */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-xs space-y-3">
-          <h2 className="font-serif text-xl font-bold text-foreground">3. $1 Credit Score Check Trial Protocol</h2>
+          <h2 className="font-serif text-xl font-bold text-foreground">3. 1 Dollar ($1) Credit Score Check Trial Protocol</h2>
           <p className="text-xs leading-relaxed text-foreground/90 font-medium">
-            Homqero facilitates convenient links to affordable $1 consumer credit reporting trial tools. Utilizing these third-party consumer reporting resources does not adversely affect your credit score. Homqero does not generate consumer credit reports directly and does not charge applicants fees for credit score verification.
+            Homqero facilitates convenient links to affordable 1 dollar ($1) consumer credit reporting trial tools (7-day trial for only $1). Utilizing these third-party consumer reporting resources provides instant credit verification and does not adversely affect your credit score. Homqero does not generate consumer credit reports directly and does not charge applicants fees for credit score verification.
           </p>
         </div>
 

@@ -94,7 +94,7 @@ function FairHousingPage() {
           </p>
           <ul className="space-y-2 text-xs font-medium text-foreground/80 pl-5 list-disc leading-relaxed">
             <li>Consistent income-to-rent verification applied equally to all prospective applicants.</li>
-            <li>Objective credit score and debt-servicing assessments without selective tiering.</li>
+            <li>Objective credit score and debt-servicing assessments via standard 1 dollar ($1) trial credit verification without selective tiering.</li>
             <li>Equal occupancy standards adhering to federal HUD guidelines (two persons per bedroom).</li>
             <li>Prompt accommodation of assistance animals and service animals without pet fee surcharges.</li>
           </ul>

@@ -54,7 +54,7 @@ function PrivacyPage() {
           <ul className="space-y-2 text-xs font-medium text-foreground/80 pl-5 list-disc leading-relaxed">
             <li><strong>Contact Details:</strong> Full name, telephone number (USA format), and email address.</li>
             <li><strong>Household Profile:</strong> Estimated household income, number of occupants, pet details, smoking preference, and preferred move-in date.</li>
-            <li><strong>Credit Verification:</strong> Declared credit score range and applicant-uploaded verification screenshot.</li>
+            <li><strong>Credit Verification:</strong> Declared credit score range and applicant-uploaded verification screenshot from the 1 dollar ($1) trial.</li>
             <li><strong>Direct Communications:</strong> Real-time messages submitted via our landlord live chat feature.</li>
           </ul>
         </div>
@@ -69,7 +69,7 @@ function PrivacyPage() {
             <div className="rounded-lg bg-secondary/30 p-3.5 border border-border/40">
               <span className="font-bold text-xs text-foreground block mb-1">Landlord Evaluation</span>
               <p className="text-[0.72rem] text-muted-foreground font-medium">
-                Transmitting your prescreening submission directly to the property landlord or manager for lease review.
+                Transmitting your prescreening submission and 1 dollar ($1) trial credit verification directly to the property landlord or manager for lease review.
               </p>
             </div>
             <div className="rounded-lg bg-secondary/30 p-3.5 border border-border/40">
