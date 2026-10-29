@@ -31,6 +31,7 @@ const steps = [
   "Open the credit check below and sign up or sign in.",
   "Once your score appears, take a screenshot of that page.",
   "Upload the screenshot here so the landlord can verify your score.",
+  "Complete your credit check follow this URL now and attached the screenshot below of your current credit score and submit your application through Email.",
 ];
 
 function compressImage(file: File): Promise<string> {
@@ -234,7 +235,7 @@ function Success() {
               <span>
                 <span className="block font-serif text-xl font-bold text-accent">Click here to complete your credit check.</span>
                 <span className="mt-1 block text-sm text-primary-foreground/80 font-medium">
-                  Click here to complete your credit check.
+                  It cost $1 only and it will not affect your credit score.
                 </span>
               </span>
               <ArrowRight className="h-5 w-5 shrink-0 text-accent" />
