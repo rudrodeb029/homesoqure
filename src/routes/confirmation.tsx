@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { SpaShell } from "@/components/SpaShell";
-import { Check, Clock, Home } from "lucide-react";
+import { Check, Clock, Home, MessageCircle } from "@/lib/lucide-react";
 import { getPropertyById, getLatestSubmission, type Property, type Submission, DEFAULT_PROPERTY } from "@/lib/property-store";
 
 export const Route = createFileRoute("/confirmation")({
@@ -57,14 +57,14 @@ export function ConfirmationPage() {
             <Check className="h-8 w-8 stroke-[2.5]" />
           </div>
 
-          <h1 className="font-serif text-4xl text-foreground sm:text-5xl">
-            Application <span className="font-script text-5xl text-primary sm:text-6xl">Submitted</span>
+          <h1 className="font-serif text-4xl font-bold text-foreground sm:text-5xl">
+            Application Submitted
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground sm:text-base">
+          <p className="mt-3 text-sm text-muted-foreground sm:text-base font-medium">
             Your rental prescreening details and credit score verification have been successfully delivered to the property landlord.
           </p>
 
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             Status: Under Landlord Review
           </div>
@@ -76,7 +76,7 @@ export function ConfirmationPage() {
             <span className="font-mono text-muted-foreground">
               Confirmation ID: <strong className="text-foreground">{submission?.id || `HQ-2026-${property.zip}`}</strong>
             </span>
-            <span className="text-muted-foreground">{currentDate}</span>
+            <span className="text-muted-foreground font-medium">{currentDate}</span>
           </div>
 
           <div className="p-5 flex items-center gap-4">
@@ -90,10 +90,10 @@ export function ConfirmationPage() {
               <HouseMark />
             )}
             <div className="text-sm">
-              <span className="eyebrow text-[0.6rem] text-primary">Target Rental Property</span>
-              <p className="font-serif text-xl font-semibold text-foreground">{property.address}</p>
-              <p className="text-xs text-muted-foreground">{property.city}, {property.state} {property.zip}</p>
-              <p className="mt-1 font-semibold text-foreground">
+              <span className="eyebrow text-[0.6rem] font-bold text-primary">Target Rental Property</span>
+              <p className="font-serif text-xl font-bold text-foreground">{property.address}</p>
+              <p className="text-xs text-muted-foreground font-medium">{property.city}, {property.state} {property.zip}</p>
+              <p className="mt-1 font-bold text-foreground">
                 ${property.price} <span className="font-normal text-muted-foreground">/ month</span>
               </p>
             </div>
@@ -102,8 +102,8 @@ export function ConfirmationPage() {
 
         {/* Modern Coded Architecture Timeline */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="font-serif text-xl text-foreground">What happens next?</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <h2 className="font-serif text-xl font-bold text-foreground">What happens next?</h2>
+          <p className="mt-1 text-xs text-muted-foreground font-medium">
             Follow the roadmap below as your rental prescreening progresses:
           </p>
 
@@ -114,8 +114,8 @@ export function ConfirmationPage() {
                 <Check className="h-4 w-4 stroke-[3]" />
               </div>
               <div className="pt-0.5">
-                <p className="text-sm font-semibold text-foreground">1. Application & Credit Score Received</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="text-sm font-bold text-foreground">1. Application &amp; Credit Score Received</p>
+                <p className="mt-0.5 text-xs text-muted-foreground font-medium">
                   Your household income, desired move-in date, pet preferences, and credit verification were securely transmitted.
                 </p>
               </div>
@@ -128,49 +128,48 @@ export function ConfirmationPage() {
               </div>
               <div className="pt-0.5">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-foreground">2. Landlord Prescreen Review</p>
-                  <span className="rounded bg-accent/30 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider text-foreground">Active</span>
+                  <p className="text-sm font-bold text-foreground">2. Landlord Review &amp; Verification</p>
+                  <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[0.65rem] font-bold text-accent-foreground">In Progress</span>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  The landlord reviews applications in the order received. Expect an email or text update within <strong>24 to 48 hours</strong>.
+                <p className="mt-0.5 text-xs text-muted-foreground font-medium">
+                  The landlord reviews your income-to-rent ratio, verified credit score screenshot, and scheduled move-in availability.
                 </p>
               </div>
             </div>
 
             {/* Step 3: Upcoming */}
-            <div className="flex items-start gap-4 opacity-75">
+            <div className="flex items-start gap-4">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground">
-                <Home className="h-4 w-4" />
+                <span className="text-xs font-bold">3</span>
               </div>
               <div className="pt-0.5">
-                <p className="text-sm font-semibold text-foreground">3. Showing Schedule & Next Steps</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  If pre-approved, you will receive a direct invitation to view the property (in-person or virtual) and finalize lease paperwork.
+                <p className="text-sm font-bold text-muted-foreground">3. Showing Tour &amp; Lease Finalization</p>
+                <p className="mt-0.5 text-xs text-muted-foreground font-medium">
+                  Approved applicants receive direct phone and email follow-up from the landlord to arrange private walkthroughs and sign the lease agreement.
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Support & Action Buttons */}
-        <div className="space-y-4 text-center">
-          <div className="rounded-lg bg-secondary/50 p-4 text-xs text-muted-foreground">
-            Questions regarding this rental? Call Renter Support at{" "}
-            <a href={`tel:${property.supportPhone || "+16464313060"}`} className="font-semibold text-foreground underline underline-offset-2">
-              {property.supportPhone || "+1 (646) 431-3060"}
-            </a>{" "}
-            (Mon–Fri 9am–6pm EST).
-          </div>
+        {/* Live Chat prompt card */}
+        <div className="rounded-xl border border-primary/20 bg-secondary/50 p-5 text-center">
+          <p className="font-bold text-sm text-foreground">Have a question for the landlord right now?</p>
+          <p className="mt-1 text-xs text-muted-foreground font-medium">
+            Use the Live Chat bubble in the bottom right corner to message the property manager directly.
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link
-              to="/"
-              search={property.id ? { p: property.id } : undefined}
-              className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-8 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground transition hover:bg-espresso shadow-sm"
-            >
-              Return to Property
-            </Link>
-          </div>
+        {/* Return Button */}
+        <div className="text-center pt-2">
+          <Link
+            to="/"
+            search={property.id ? { p: property.id } : undefined}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] text-foreground shadow-xs transition hover:bg-secondary cursor-pointer"
+          >
+            <Home className="h-4 w-4" />
+            <span>Return to Rental Listing</span>
+          </Link>
         </div>
       </div>
     </SpaShell>

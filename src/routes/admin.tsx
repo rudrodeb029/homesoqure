@@ -21,7 +21,11 @@ import {
   EyeOff,
   LogOut,
   Key,
-  ShieldCheck
+  ShieldCheck,
+  MessageSquare,
+  Send,
+  Mail,
+  Sparkles,
 } from "lucide-react";
 import {
   getProperties,
@@ -34,6 +38,20 @@ import {
   type Property,
   type Submission,
 } from "@/lib/property-store";
+import {
+  subscribeToAllChatThreads,
+  subscribeToChatMessages,
+  sendChatMessage,
+  markChatReadByAdmin,
+  type ChatThread,
+  type ChatMessage,
+} from "@/lib/chat-store";
+import {
+  analyzeTenantApplication,
+  generateApplicationEmail,
+  dispatchApplicationEmail,
+  type TenantAnalysisReport,
+} from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -51,8 +69,8 @@ function AdminPage() {
   const [passwordError, setPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Tab state: "properties" | "submissions" | "security"
-  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "security">("properties");
+  // Tab state: "properties" | "submissions" | "chat" | "security"
+  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "chat" | "security">("properties");
   const [submissionFilter, setSubmissionFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
   const [selectedScreenshotModal, setSelectedScreenshotModal] = useState<{
     url: string;
@@ -61,6 +79,17 @@ function AdminPage() {
   } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Live Chat state
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [activeChatMessages, setActiveChatMessages] = useState<ChatMessage[]>([]);
+  const [adminReplyText, setAdminReplyText] = useState("");
+
+  // Deep Analysis & Email Report modal state
+  const [selectedAnalysisSubmission, setSelectedAnalysisSubmission] = useState<Submission | null>(null);
+  const [copyEmailSuccess, setCopyEmailSuccess] = useState(false);
+  const [emailSendStatus, setEmailSendStatus] = useState("");
 
   // Password change state
   const [currentPasswordInput, setCurrentPasswordInput] = useState("");
@@ -130,6 +159,41 @@ function AdminPage() {
       unsubProps();
     };
   }, []);
+
+  // Real-time Chat Threads Listener
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const unsubChats = subscribeToAllChatThreads((threads) => {
+      setChatThreads(threads);
+      setSelectedChatId((current) => current || (threads[0]?.id ?? null));
+    });
+    return () => unsubChats();
+  }, [isAuthenticated]);
+
+  // Real-time Active Chat Messages Listener
+  useEffect(() => {
+    if (!selectedChatId) {
+      setActiveChatMessages([]);
+      return;
+    }
+    markChatReadByAdmin(selectedChatId);
+    const unsubMsgs = subscribeToChatMessages(selectedChatId, (msgs) => {
+      setActiveChatMessages(msgs);
+    });
+    return () => unsubMsgs();
+  }, [selectedChatId]);
+
+  const handleSendAdminReply = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!adminReplyText.trim() || !selectedChatId) return;
+    const text = adminReplyText.trim();
+    setAdminReplyText("");
+    await sendChatMessage(selectedChatId, "admin", text);
+  };
+
+  const handleSelectQuickReply = (text: string) => {
+    setAdminReplyText(text);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,6 +321,7 @@ function AdminPage() {
   const completedCount = submissions.filter((s) => s.status === "completed").length;
   const pendingCount = submissions.filter((s) => s.status === "pending_credit").length;
   const incompleteCount = submissions.filter((s) => s.status === "incomplete").length;
+  const unreadChatsCount = chatThreads.reduce((sum, t) => sum + (t.unreadAdminCount > 0 ? 1 : 0), 0);
 
   const filteredSubmissions = submissions.filter((s) => {
     if (submissionFilter === "all") return true;
@@ -359,12 +424,12 @@ function AdminPage() {
       <aside className="w-full md:w-64 lg:w-72 border-r border-border bg-card flex flex-col shrink-0 md:min-h-screen">
         {/* Sidebar Brand Header */}
         <div className="p-5 border-b border-border flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border font-script text-2xl text-primary bg-secondary/60 shadow-xs">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border font-serif font-bold text-2xl text-primary bg-secondary/60 shadow-xs">
             H
           </span>
           <div>
             <span className="block font-serif text-lg font-bold leading-tight text-foreground">Homqero</span>
-            <span className="eyebrow text-[0.55rem] text-muted-foreground">Landlord Admin</span>
+            <span className="eyebrow text-[0.55rem] text-muted-foreground font-bold">Landlord Admin</span>
           </div>
         </div>
 
@@ -429,7 +494,37 @@ function AdminPage() {
             </div>
           </button>
 
-          {/* 3. Post New Property */}
+          {/* 3. Live Tenant Chat */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("chat");
+              setIsCreating(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === "chat"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-foreground/80 hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="h-4 w-4" />
+              <span>Live Chat</span>
+            </div>
+            {unreadChatsCount > 0 ? (
+              <span className="rounded-full bg-red-600 text-white px-2 py-0.5 text-[0.65rem] font-bold animate-pulse">
+                {unreadChatsCount} new
+              </span>
+            ) : (
+              <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${
+                activeTab === "chat" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-secondary text-foreground"
+              }`}>
+                {chatThreads.length}
+              </span>
+            )}
+          </button>
+
+          {/* 4. Post New Property */}
           <button
             type="button"
             onClick={() => {
@@ -446,7 +541,7 @@ function AdminPage() {
             <span>Post New Property</span>
           </button>
 
-          {/* 4. Password & Security */}
+          {/* 5. Password & Security */}
           <button
             type="button"
             onClick={() => {
@@ -465,7 +560,7 @@ function AdminPage() {
 
           <div className="pt-3 border-t border-border/60 my-2" />
 
-          {/* 5. Live Website Link */}
+          {/* 6. Live Website Link */}
           <Link
             to="/"
             target="_blank"
@@ -508,17 +603,21 @@ function AdminPage() {
             <h1 className="font-serif text-2xl font-bold leading-tight">
               {activeTab === "security"
                 ? "Password & Security Settings"
+                : activeTab === "chat"
+                ? "Live Landlord Chat Support"
                 : activeTab === "submissions"
                 ? "Tenant Prescreening Submissions"
                 : isCreating
                 ? "Create New Property Post"
                 : "Rental Property Postings"}
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground font-medium">
               {activeTab === "security"
                 ? "Manage your admin portal access password."
+                : activeTab === "chat"
+                ? "Chat directly in real-time with prospective tenants visiting your rental listings."
                 : activeTab === "submissions"
-                ? "Review submitted applicant income, move-in details, and credit score screenshots."
+                ? "Review submitted applicant income, move-in details, deep analysis, and credit score screenshots."
                 : "Manage property listings, photos, and shareable tenant prescreening links."}
             </p>
           </div>
@@ -1261,11 +1360,222 @@ function AdminPage() {
                             <p className="text-foreground italic">{sub.questions}</p>
                           </div>
                         )}
+
+                        {/* Deep Analysis & Email Report Action Bar */}
+                        <div className="mt-4 pt-3.5 border-t border-border flex flex-wrap items-center justify-between gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAnalysisSubmission(sub)}
+                            className="inline-flex items-center gap-2 rounded-lg bg-espresso px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-espresso/90 shadow-xs transition cursor-pointer"
+                          >
+                            <Sparkles className="h-4 w-4 text-accent" />
+                            <span>Deep Analysis &amp; Email Report</span>
+                          </button>
+
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                            <Mail className="h-3.5 w-3.5 text-primary" />
+                            <span>Contact: <strong className="text-foreground">{sub.email || sub.phone || "No direct contact"}</strong></span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ------------------------------------------------------- */}
+          {/* VIEW: LIVE TENANT CHAT DASHBOARD */}
+          {/* ------------------------------------------------------- */}
+          {activeTab === "chat" && (
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col md:flex-row h-[720px]">
+              {/* Left Column: Chat Threads List */}
+              <div className="w-full md:w-80 border-r border-border flex flex-col shrink-0 bg-secondary/15">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h3 className="font-serif text-base font-bold text-foreground">Conversations</h3>
+                    <p className="text-[0.68rem] text-muted-foreground font-medium">{chatThreads.length} active visitor chat(s)</p>
+                  </div>
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" title="Live Firestore connection active" />
+                </div>
+
+                <div className="flex-1 overflow-y-auto divide-y divide-border/60">
+                  {chatThreads.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground">
+                      <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                      <p className="font-bold">No active chats yet</p>
+                      <p className="mt-1 text-[0.7rem] font-medium leading-relaxed">
+                        When prospective tenants message from your rental listings, their conversations appear here in real-time.
+                      </p>
+                    </div>
+                  ) : (
+                    chatThreads.map((thread) => {
+                      const isSelected = selectedChatId === thread.id;
+                      const hasUnread = thread.unreadAdminCount > 0;
+                      const timeStr = new Date(thread.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                      return (
+                        <div
+                          key={thread.id}
+                          onClick={() => setSelectedChatId(thread.id)}
+                          className={`p-3.5 cursor-pointer transition flex items-start gap-3 ${
+                            isSelected
+                              ? "bg-primary/10 border-l-4 border-l-primary"
+                              : "hover:bg-secondary/50"
+                          }`}
+                        >
+                          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary font-serif font-bold text-xs text-primary border border-border">
+                            {thread.tenantName ? thread.tenantName[0]?.toUpperCase() : "T"}
+                            {hasUnread && (
+                              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-600 ring-2 ring-card" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1 mb-0.5">
+                              <span className={`text-xs truncate ${hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90"}`}>
+                                {thread.tenantName}
+                              </span>
+                              <span className="text-[0.62rem] text-muted-foreground shrink-0">{timeStr}</span>
+                            </div>
+                            <p className="text-[0.68rem] text-muted-foreground truncate mb-1 font-medium">
+                              {thread.propertyAddress}
+                            </p>
+                            <p className={`text-xs truncate ${hasUnread ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+                              {thread.lastMessage || "No messages yet"}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Active Conversation Thread */}
+              <div className="flex-1 flex flex-col min-w-0 bg-background">
+                {selectedChatId ? (
+                  (() => {
+                    const activeThread = chatThreads.find((t) => t.id === selectedChatId);
+
+                    return (
+                      <>
+                        {/* Conversation Header */}
+                        <div className="p-4 border-b border-border bg-card flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-serif text-lg font-bold text-foreground">
+                                {activeThread?.tenantName || "Prospective Tenant"}
+                              </h3>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[0.62rem] font-bold">
+                                Live Session
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-0.5 font-medium">
+                              <span>Property: <strong className="text-foreground">{activeThread?.propertyAddress || "General Inquiry"}</strong></span>
+                              {activeThread?.tenantPhone && <span>Phone: <strong className="text-foreground">{activeThread.tenantPhone}</strong></span>}
+                              {activeThread?.tenantEmail && <span>Email: <strong className="text-foreground">{activeThread.tenantEmail}</strong></span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Message Stream */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-secondary/10">
+                          {activeChatMessages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6">
+                              <MessageSquare className="h-10 w-10 text-muted-foreground/30 mb-2" />
+                              <p className="font-bold text-sm text-foreground">Beginning of Conversation</p>
+                              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                                Respond to the tenant below or pick a quick response template to start chatting.
+                              </p>
+                            </div>
+                          ) : (
+                            activeChatMessages.map((msg) => {
+                              const isAdmin = msg.sender === "admin";
+                              const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                              return (
+                                <div
+                                  key={msg.id}
+                                  className={`flex flex-col ${isAdmin ? "items-end" : "items-start"}`}
+                                >
+                                  <div className="flex items-center gap-1.5 mb-1 px-1">
+                                    <span className="text-[0.65rem] font-bold text-muted-foreground">
+                                      {isAdmin ? "You (Landlord Support)" : (activeThread?.tenantName || "Tenant")}
+                                    </span>
+                                    <span className="text-[0.6rem] text-muted-foreground/60">{timeStr}</span>
+                                  </div>
+                                  <div
+                                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-2xs ${
+                                      isAdmin
+                                        ? "bg-primary text-primary-foreground rounded-br-xs"
+                                        : "bg-card border border-border text-foreground rounded-bl-xs"
+                                    }`}
+                                  >
+                                    {msg.text}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Quick Response Templates */}
+                        <div className="px-4 py-2.5 border-t border-border bg-secondary/20 flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="text-[0.65rem] font-bold uppercase text-muted-foreground tracking-wider mr-1">Quick Replies:</span>
+                          {[
+                            "Hello! Thank you for applying. When would you like to schedule an in-person tour?",
+                            "Your application is currently being reviewed by our team. We'll update you shortly!",
+                            "We received your credit score screenshot. Everything looks great!",
+                            "Could you confirm your intended move-in date?",
+                          ].map((tmpl) => (
+                            <button
+                              key={tmpl}
+                              type="button"
+                              onClick={() => handleSelectQuickReply(tmpl)}
+                              className="rounded-full border border-border bg-card px-2.5 py-1 text-[0.68rem] font-medium text-foreground hover:border-primary hover:text-primary transition cursor-pointer truncate max-w-xs"
+                              title={tmpl}
+                            >
+                              {tmpl}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Reply Input Bar */}
+                        <form
+                          onSubmit={handleSendAdminReply}
+                          className="p-3.5 border-t border-border bg-card flex items-center gap-2"
+                        >
+                          <input
+                            type="text"
+                            value={adminReplyText}
+                            onChange={(e) => setAdminReplyText(e.target.value)}
+                            placeholder="Type reply to tenant..."
+                            className="flex-1 rounded-full border border-border bg-background px-4 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!adminReplyText.trim()}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-xs hover:bg-espresso transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            <span>Send</span>
+                          </button>
+                        </form>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                    <p className="font-bold text-base text-foreground">Select a Chat Conversation</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm font-medium">
+                      Choose an applicant from the left to start real-time two-way messaging.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1401,6 +1711,181 @@ function AdminPage() {
               >
                 Close Preview
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* DEEP TENANT ANALYSIS & FORMATTED EMAIL REPORT MODAL */}
+      {/* ------------------------------------------------------------- */}
+      {selectedAnalysisSubmission && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setSelectedAnalysisSubmission(null)}
+        >
+          <div
+            className="relative max-h-[92vh] max-w-3xl w-full rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-espresso text-accent shadow-xs">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-foreground">
+                    Deep Tenant Analysis &amp; Email Report
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    {selectedAnalysisSubmission.firstName} {selectedAnalysisSubmission.lastName} · {selectedAnalysisSubmission.propertyAddress}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedAnalysisSubmission(null)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="overflow-y-auto flex-1 pr-1 space-y-5 text-xs">
+              {(() => {
+                const targetProp = properties.find((p) => p.id === selectedAnalysisSubmission.propertyId) || properties[0] || {
+                  id: "prop",
+                  address: selectedAnalysisSubmission.propertyAddress || "406 SE Railroad St",
+                  city: "Manning",
+                  state: "SC",
+                  zip: "29102",
+                  price: 1500,
+                  creditCheckUrl: "#",
+                  supportPhone: "+1 (646) 431-3060",
+                  createdAt: new Date().toISOString(),
+                };
+                const report = analyzeTenantApplication(selectedAnalysisSubmission, targetProp);
+                const emailData = generateApplicationEmail(selectedAnalysisSubmission, targetProp);
+
+                return (
+                  <>
+                    {/* Score & Verdict Banner */}
+                    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <span className="eyebrow text-[0.62rem] font-bold text-primary">Algorithmic Tenant Assessment</span>
+                        <h4 className="font-serif text-2xl font-bold text-foreground mt-0.5">
+                          {report.overallVerdict}
+                        </h4>
+                        <p className="text-muted-foreground mt-1 text-xs font-medium">
+                          {report.executiveSummary}
+                        </p>
+                      </div>
+                      <div className="flex sm:flex-col items-center justify-center rounded-xl bg-card border border-border p-3 shrink-0 text-center min-w-[100px]">
+                        <span className="text-[0.65rem] font-bold uppercase text-muted-foreground">Score</span>
+                        <span className="text-2xl font-bold text-primary">{report.overallScore}<span className="text-xs font-normal text-muted-foreground">/100</span></span>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <span className="font-bold text-foreground block text-xs">Income Multiple</span>
+                        <span className="text-lg font-bold text-primary mt-1 block">{report.incomeMultiplier}x rent</span>
+                        <p className="text-[0.7rem] text-muted-foreground mt-1 leading-relaxed font-medium">{report.incomeAssessment}</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <span className="font-bold text-foreground block text-xs">Credit Score Risk</span>
+                        <span className="text-lg font-bold text-primary mt-1 block">{report.creditTier}</span>
+                        <p className="text-[0.7rem] text-muted-foreground mt-1 leading-relaxed font-medium">{report.creditAssessment}</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <span className="font-bold text-foreground block text-xs">Occupancy &amp; Pet Risk</span>
+                        <span className="text-lg font-bold text-primary mt-1 block">{selectedAnalysisSubmission.people || 1} Occupant(s)</span>
+                        <p className="text-[0.7rem] text-muted-foreground mt-1 leading-relaxed font-medium">{report.petAssessment}</p>
+                      </div>
+                    </div>
+
+                    {/* Landlord Recommendations */}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <h5 className="font-bold text-foreground text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                        <span>Action Checklist &amp; Landlord Recommendations</span>
+                      </h5>
+                      <ul className="space-y-1.5 pl-5 list-disc text-muted-foreground text-xs font-medium">
+                        {report.recommendations.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Formatted Email Notification Section */}
+                    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                      <div className="flex items-center justify-between border-b border-border pb-2">
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="h-4 w-4 text-primary" />
+                          <h5 className="font-bold text-foreground text-xs uppercase tracking-wider">
+                            Generated Application Notification Email
+                          </h5>
+                        </div>
+                        <span className="text-[0.65rem] text-muted-foreground font-bold">Proper Title &amp; Description</span>
+                      </div>
+
+                      <div>
+                        <label className="block text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                          Email Subject / Title:
+                        </label>
+                        <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2 font-mono text-xs font-bold text-foreground select-all">
+                          {emailData.subject}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                          Email Description &amp; Full Report Body:
+                        </label>
+                        <pre className="max-h-60 overflow-y-auto rounded-lg border border-border bg-secondary/30 p-3 font-mono text-[0.72rem] leading-relaxed text-foreground whitespace-pre-wrap select-all">
+                          {emailData.text}
+                        </pre>
+                      </div>
+
+                      {/* Modal Actions */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`Subject: ${emailData.subject}\n\n${emailData.text}`);
+                            setCopyEmailSuccess(true);
+                            setTimeout(() => setCopyEmailSuccess(false), 2500);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>{copyEmailSuccess ? "Copied Email!" : "Copy Full Email Report"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setEmailSendStatus("Sending...");
+                            const success = await dispatchApplicationEmail(selectedAnalysisSubmission, targetProp);
+                            setEmailSendStatus(success ? "Email Dispatched to Landlord Mailbox!" : "Saved to Dispatch Queue");
+                            setTimeout(() => setEmailSendStatus(""), 3000);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/80 px-4 py-2 text-xs font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition cursor-pointer"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          <span>{emailSendStatus || "Send Email to Landlord"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -1,15 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState, useEffect } from "react";
-import { ArrowRight, Upload, Check, X, Image as ImageIcon } from "lucide-react";
+import { ArrowRight, Upload, Check, X, AlertCircle } from "@/lib/lucide-react";
 import { SpaShell } from "@/components/SpaShell";
-import { getPropertyById, markSubmissionCompleted, type Property, DEFAULT_PROPERTY } from "@/lib/property-store";
+import {
+  getPropertyById,
+  markSubmissionCompleted,
+  getLatestSubmission,
+  type Property,
+  DEFAULT_PROPERTY,
+} from "@/lib/property-store";
+import { dispatchApplicationEmail } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/success")({
   head: () => ({
     meta: [
-      { title: "Complete Your Free Credit Score · Homqero" },
+      { title: "Complete Your Free Credit Score · Homqero Rentals USA" },
       { name: "description", content: "Check your credit score for free and upload a screenshot so the landlord can verify it." },
-      { property: "og:title", content: "Complete Your Free Credit Score · Homqero" },
+      { property: "og:title", content: "Complete Your Free Credit Score · Homqero Rentals USA" },
       { property: "og:description", content: "Free credit score check for your rental application — no impact on your score." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -69,11 +76,13 @@ function compressImage(file: File): Promise<string> {
 function Success() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadContainerRef = useRef<HTMLDivElement>(null);
   const [property, setProperty] = useState<Property>(DEFAULT_PROPERTY);
   const [fileName, setFileName] = useState("");
   const [fileDataUrl, setFileDataUrl] = useState("");
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -88,6 +97,7 @@ function Success() {
     if (!file) return;
 
     setFileName(file.name);
+    setUploadError("");
     setIsProcessingFile(true);
     try {
       const compressedUrl = await compressImage(file);
@@ -111,12 +121,29 @@ function Success() {
   };
 
   const handleSubmit = () => {
-    if (!fileName) {
-      fileRef.current?.click();
+    if (!fileName || !fileDataUrl) {
+      setUploadError("Please upload your credit score screenshot to complete your application.");
+      uploadContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+
     setIsSubmitting(true);
     markSubmissionCompleted(fileName, fileDataUrl);
+
+    // Dispatch final completed application email with deep analysis and screenshot report
+    const active = getLatestSubmission();
+    if (active) {
+      dispatchApplicationEmail(
+        {
+          ...active,
+          status: "completed",
+          screenshotName: fileName,
+          screenshotUrl: fileDataUrl,
+        },
+        property
+      );
+    }
+
     navigate({
       to: "/confirmation",
       search: property.id ? { p: property.id } : undefined,
@@ -133,20 +160,20 @@ function Success() {
           <span>(${property.price}/mo)</span>
         </div>
 
-        <h1 className="font-serif text-4xl text-foreground">
-          Complete your <span className="font-script text-5xl text-primary">free credit score</span>
+        <h1 className="font-serif text-4xl font-bold text-foreground">
+          Complete your free credit score
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="mt-3 text-sm text-muted-foreground font-medium">
           Landlords ask for a recent credit score before approving an application. Checking it below is free and will not affect your score.
         </p>
 
         <ol className="mt-8 space-y-5">
           {steps.map((s, i) => (
             <li key={s} className="flex items-start gap-4">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-primary">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-primary">
                 {i + 1}
               </span>
-              <p className="pt-1.5 text-sm text-foreground">{s}</p>
+              <p className="pt-1.5 text-sm font-medium text-foreground">{s}</p>
             </li>
           ))}
         </ol>
@@ -158,17 +185,29 @@ function Success() {
           className="mt-8 flex items-center justify-between gap-4 rounded-lg bg-espresso p-5 text-primary-foreground transition hover:opacity-95"
         >
           <span>
-            <span className="block font-serif text-xl text-accent">Check your credit score — free</span>
-            <span className="mt-1 block text-sm text-primary-foreground/80">
+            <span className="block font-serif text-xl font-bold text-accent">Check your credit score — free</span>
+            <span className="mt-1 block text-sm text-primary-foreground/80 font-medium">
               Opens in a new tab · takes about 2 minutes · no impact on your score
             </span>
           </span>
           <ArrowRight className="h-5 w-5 shrink-0 text-accent" />
         </a>
 
-        <div className="mt-4 rounded-lg border border-border bg-card p-5">
-          <p className="font-semibold text-foreground">Upload your credit score screenshot</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+        {/* Screenshot Upload Container */}
+        <div
+          ref={uploadContainerRef}
+          className={`mt-4 rounded-lg border p-5 transition-all scroll-mt-24 ${
+            uploadError
+              ? "border-red-500 bg-red-500/5 ring-2 ring-red-500/20"
+              : "border-border bg-card"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="font-bold text-foreground">
+              Upload your credit score screenshot <span className="text-red-600 dark:text-red-400">*</span>
+            </p>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground font-medium">
             PNG, JPG or PDF · one clear, full-page screenshot taken today is enough
           </p>
 
@@ -184,13 +223,13 @@ function Success() {
               <div className="p-3 border-t border-border flex items-center justify-between bg-card text-xs">
                 <div className="flex items-center gap-2 truncate pr-2">
                   <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span className="font-medium text-foreground truncate">{fileName}</span>
+                  <span className="font-bold text-foreground truncate">{fileName}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="text-primary hover:underline font-medium cursor-pointer"
+                    className="text-primary hover:underline font-bold cursor-pointer"
                   >
                     Change
                   </button>
@@ -198,7 +237,7 @@ function Success() {
                   <button
                     type="button"
                     onClick={handleRemoveFile}
-                    className="text-destructive hover:underline font-medium cursor-pointer"
+                    className="text-red-600 hover:underline font-bold cursor-pointer"
                   >
                     Remove
                   </button>
@@ -210,14 +249,25 @@ function Success() {
               type="button"
               disabled={isProcessingFile}
               onClick={() => fileRef.current?.click()}
-              className="mt-4 flex w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-input bg-secondary/50 px-4 py-10 text-center transition hover:border-primary cursor-pointer"
+              className={`mt-4 flex w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-10 text-center transition cursor-pointer ${
+                uploadError
+                  ? "border-red-500 bg-red-500/10 text-red-700"
+                  : "border-input bg-secondary/50 hover:border-primary"
+              }`}
             >
-              <Upload className="h-6 w-6 text-primary" />
-              <span className="text-sm font-semibold text-foreground">
+              <Upload className={`h-6 w-6 ${uploadError ? "text-red-600" : "text-primary"}`} />
+              <span className="text-sm font-bold text-foreground">
                 {isProcessingFile ? "Processing screenshot..." : (fileName || "Tap to choose a file")}
               </span>
-              {!fileName && <span className="text-xs text-muted-foreground">or drag and drop it here</span>}
+              {!fileName && <span className="text-xs text-muted-foreground font-medium">or drag and drop it here</span>}
             </button>
+          )}
+
+          {uploadError && (
+            <p className="mt-3 text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{uploadError}</span>
+            </p>
           )}
 
           <input
@@ -234,14 +284,14 @@ function Success() {
             type="button"
             disabled={isSubmitting}
             onClick={handleSubmit}
-            className="h-10 rounded-full bg-primary px-10 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground transition hover:bg-espresso disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-11 rounded-full bg-primary px-12 text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground shadow-md transition hover:bg-espresso disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
           >
-            {isSubmitting ? "Submitting..." : "Submit"}
+            {isSubmitting ? "Submitting..." : "Submit Application"}
           </button>
-          <p className="mt-4 text-xs text-muted-foreground">
+          <p className="mt-4 text-xs text-muted-foreground font-medium">
             {fileName
-              ? "Screenshot attached. Press Submit to deliver to the landlord."
-              : "Choose your screenshot above, then press Submit to send it to the landlord."}
+              ? "Screenshot attached. Press Submit Application to deliver to the landlord."
+              : "Attach your screenshot above, then press Submit Application to send it to the landlord."}
           </p>
         </div>
       </div>

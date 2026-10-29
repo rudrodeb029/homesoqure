@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
 import { SpaShell } from "@/components/SpaShell";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Home } from "lucide-react";
+import { Minus, Plus, AlertCircle, Phone as PhoneIcon, Check } from "@/lib/lucide-react";
 import {
   getPropertyById,
   fetchPropertyFromCloud,
@@ -11,13 +11,15 @@ import {
   type Property,
   DEFAULT_PROPERTY,
 } from "@/lib/property-store";
+import { formatUSPhone, isValidUSPhone } from "@/lib/phone-utils";
+import { dispatchApplicationEmail } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Tell the Landlord About Yourself · Homqero" },
+      { title: "Tell the Landlord About Yourself · Homqero Rentals USA" },
       { name: "description", content: "Homqero rental prescreener: share employment, income, credit score and move-in details with the landlord." },
-      { property: "og:title", content: "Tell the Landlord About Yourself · Homqero" },
+      { property: "og:title", content: "Tell the Landlord About Yourself · Homqero Rentals USA" },
       { property: "og:description", content: "Quick rental prescreener for US apartments and homes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -29,33 +31,49 @@ export const Route = createFileRoute("/")({
 const employment = ["Employed full-time", "Employed part-time", "Self-employed", "Student", "Retired", "Other"];
 const credit = ["350 – 599", "600 – 649", "650 – 699", "700 – 749", "750 – 850", "I don't know my credit score"];
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
   return (
-    <section className="border-t border-border pt-8">
-      <h2 className="font-serif text-2xl text-foreground">{title}</h2>
+    <section id={id} className="border-t border-border pt-8 scroll-mt-20">
+      <h2 className="font-serif text-2xl font-bold text-foreground">{title}</h2>
       <div className="mt-5 space-y-6">{children}</div>
     </section>
   );
 }
 
-function Q({ label, hint, children }: { label: string; hint?: string; children?: ReactNode }) {
+function Q({
+  id,
+  label,
+  hint,
+  error,
+  required,
+  children,
+}: {
+  id?: string;
+  label: string;
+  hint?: string;
+  error?: string;
+  required?: boolean;
+  children?: ReactNode;
+}) {
   return (
-    <div>
-      <p className="text-sm font-semibold text-foreground">{label}</p>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+    <div
+      id={id}
+      className={`scroll-mt-24 transition-colors rounded-lg p-1.5 ${
+        error ? "border border-red-500/80 bg-red-50/40 dark:bg-red-950/20 ring-1 ring-red-500/20 p-3" : ""
+      }`}
+    >
+      <p className={`text-sm font-bold ${error ? "text-red-700 dark:text-red-400" : "text-foreground"}`}>
+        {label}
+        {required && <span className="text-red-600 dark:text-red-400 ml-1">*</span>}
+      </p>
+      {hint && <p className="mt-1 text-xs text-muted-foreground font-medium">{hint}</p>}
       {children && <div className="mt-3">{children}</div>}
-    </div>
-  );
-}
-
-function Radios({ name, options, col, onChange }: { name: string; options: string[]; col?: boolean; onChange?: (value: string) => void }) {
-  return (
-    <div className={col ? "grid gap-2" : "flex flex-wrap gap-x-6 gap-y-2"}>
-      {options.map((o) => (
-        <label key={o} className="flex items-center gap-2 text-sm">
-          <input type="radio" name={name} value={o} onChange={() => onChange?.(o)} className="accent-primary" /> {o}
-        </label>
-      ))}
+      {error && (
+        <p className="mt-2 text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -84,9 +102,11 @@ function Index() {
   const [moveInDate, setMoveInDate] = useState("");
   const [people, setPeople] = useState(1);
   const [hasPets, setHasPets] = useState(false);
+  const [petOptionChosen, setPetOptionChosen] = useState(false);
   const [petDetails, setPetDetails] = useState("");
   const [smoking, setSmoking] = useState("");
   const [wantsShowing, setWantsShowing] = useState(false);
+  const [showingOptionChosen, setShowingOptionChosen] = useState(false);
   const [showingTypes, setShowingTypes] = useState<string[]>([]);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -94,6 +114,9 @@ function Index() {
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState("");
   const [questions, setQuestions] = useState("");
+
+  // Validation error state
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -163,6 +186,9 @@ function Index() {
   const handleToggleEmployment = (item: string) => {
     setSelectedEmployment((prev) => {
       const next = prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item];
+      if (errors.employment && next.length > 0) {
+        setErrors((errs) => ({ ...errs, employment: "" }));
+      }
       return next;
     });
   };
@@ -170,15 +196,104 @@ function Index() {
   const handleToggleShowingType = (val: string) => {
     setShowingTypes((prev) => {
       const next = prev.includes(val) ? prev.filter((i) => i !== val) : [...prev, val];
+      if (errors.showingTypes && next.length > 0) {
+        setErrors((errs) => ({ ...errs, showingTypes: "" }));
+      }
       syncDraft({ showingTypes: next });
       return next;
     });
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatUSPhone(e.target.value);
+    setPhone(formatted);
+    if (errors.phone && isValidUSPhone(formatted)) {
+      setErrors((errs) => ({ ...errs, phone: "" }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    // 1. Employment
+    if (selectedEmployment.length === 0) {
+      newErrors.employment = "Please select at least one employment status.";
+    }
+    const numIncome = parseFloat(income.replace(/[^0-9.]/g, ""));
+    if (!income.trim() || isNaN(numIncome) || numIncome <= 0) {
+      newErrors.income = "Please enter your total monthly household income.";
+    }
+    if (!creditRange) {
+      newErrors.creditRange = "Please select your estimated credit score range.";
+    }
+
+    // 2. Move-in Information
+    if (!moveInDate) {
+      newErrors.moveInDate = "Please choose your desired move-in date.";
+    }
+    if (!petOptionChosen) {
+      newErrors.pets = "Please select whether you have pets.";
+    } else if (hasPets && !petDetails.trim()) {
+      newErrors.petDetails = "Please describe the pet breed, age, and weight.";
+    }
+    if (!smoking) {
+      newErrors.smoking = "Please select your smoking status.";
+    }
+    if (!showingOptionChosen) {
+      newErrors.showing = "Please select whether you are interested in a showing.";
+    } else if (wantsShowing && showingTypes.length === 0) {
+      newErrors.showingTypes = "Please select at least one showing preference.";
+    }
+
+    // 3. Contact Details
+    if (!firstName.trim()) {
+      newErrors.firstName = "Please enter your first name.";
+    }
+    if (!lastName.trim()) {
+      newErrors.lastName = "Please enter your last name.";
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+    if (!phone.trim()) {
+      newErrors.phone = "Please enter your phone number.";
+    } else if (!isValidUSPhone(phone)) {
+      newErrors.phone = "Please enter a valid 10-digit USA phone number, e.g. (555) 000-0000.";
+    }
+
+    setErrors(newErrors);
+
+    // Scroll to first invalid field
+    const errorKeys = Object.keys(newErrors);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0]!;
+      const targetElement =
+        document.getElementById(`field-${firstKey}`) ||
+        document.getElementById(`q-${firstKey}`) ||
+        document.getElementById(`section-${firstKey}`);
+
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        const inputToFocus = targetElement.querySelector("input, select, textarea") as HTMLElement | null;
+        if (inputToFocus) {
+          setTimeout(() => inputToFocus.focus(), 300);
+        }
+      }
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    saveStepOneSubmission({
+    if (!validateForm()) {
+      return;
+    }
+
+    const submissionData = {
       propertyId: property.id,
       propertyAddress: property.address,
       firstName,
@@ -196,8 +311,13 @@ function Index() {
       showingTypes,
       source,
       questions,
-      status: "pending_credit",
-    });
+      status: "pending_credit" as const,
+    };
+
+    saveStepOneSubmission(submissionData);
+
+    // Dispatch deep analysis email notification in the background
+    dispatchApplicationEmail(submissionData, property);
 
     nav({
       to: "/success",
@@ -209,14 +329,15 @@ function Index() {
     <SpaShell>
       <form
         onSubmit={handleSubmit}
+        noValidate
         onBlur={() => syncDraft()}
         className="mx-auto max-w-[520px] space-y-8"
       >
         <div>
-          <h1 className="font-serif text-4xl text-foreground">
-            Tell the landlord about <span className="font-script text-5xl text-primary">yourself</span>
+          <h1 className="font-serif text-4xl font-bold text-foreground">
+            Tell the landlord about yourself
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-muted-foreground font-medium">
             Answer a few questions so the landlord knows why you're a good fit for this rental.
           </p>
 
@@ -232,171 +353,434 @@ function Index() {
               <HouseMark />
             )}
             <div className="text-sm">
-              <span className="eyebrow text-[0.6rem] text-primary">Active Rental Listing</span>
-              <p className="font-serif text-lg font-semibold text-foreground">{property.address}</p>
-              <p className="text-muted-foreground">{property.city}, {property.state} {property.zip}</p>
-              <p className="mt-1 font-semibold text-foreground">
+              <span className="eyebrow text-[0.6rem] font-bold text-primary">Active Rental Listing</span>
+              <p className="font-serif text-lg font-bold text-foreground">{property.address}</p>
+              <p className="text-muted-foreground font-medium">{property.city}, {property.state} {property.zip}</p>
+              <p className="mt-1 font-bold text-foreground">
                 ${property.price} <span className="font-normal text-muted-foreground">/ month</span>
               </p>
             </div>
           </div>
         </div>
 
-        <Section title="Employment">
-          <Q label="Which best describes you?" hint="Select all that apply">
-            <div className="grid gap-2 sm:grid-cols-2">
+        {/* SECTION 1: EMPLOYMENT */}
+        <Section id="section-employment" title="Employment">
+          <Q
+            id="q-employment"
+            label="Which best describes you?"
+            hint="Select all that apply"
+            required
+            error={errors.employment}
+          >
+            <div id="field-employment" className="grid gap-2 sm:grid-cols-2">
               {employment.map((g) => (
-                <label key={g} className="flex items-center gap-2 text-sm">
+                <label key={g} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                   <input
                     type="checkbox"
                     checked={selectedEmployment.includes(g)}
                     onChange={() => handleToggleEmployment(g)}
-                    className="accent-primary"
+                    className="accent-primary h-4 w-4 rounded"
                   />{" "}
                   {g}
                 </label>
               ))}
             </div>
           </Q>
-          <Q label="Total monthly income" hint="Include all household income: roommates, spouse, social security, vouchers, etc.">
+
+          <Q
+            id="q-income"
+            label="Total monthly income"
+            hint="Include all household income: roommates, spouse, social security, vouchers, etc."
+            required
+            error={errors.income}
+          >
             <div className="relative max-w-xs">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">$</span>
               <input
-                type="number"
-                min="0"
-                required
+                id="field-income"
+                type="text"
+                inputMode="decimal"
+                placeholder="4,500"
                 value={income}
-                onChange={(e) => setIncome(e.target.value)}
-                className="spa-field pl-7"
+                onChange={(e) => {
+                  setIncome(e.target.value);
+                  if (errors.income) setErrors((errs) => ({ ...errs, income: "" }));
+                }}
+                className={`spa-field pl-7 font-bold ${
+                  errors.income ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
               />
             </div>
           </Q>
-          <Q label="What is your estimated credit score?" hint="Your exact score will be verified after you complete an application.">
-            <Radios name="credit" options={credit} col onChange={(val) => setCreditRange(val)} />
+
+          <Q
+            id="q-creditRange"
+            label="What is your estimated credit score?"
+            hint="Your exact score will be verified after you complete an application."
+            required
+            error={errors.creditRange}
+          >
+            <div id="field-creditRange" className="grid gap-2">
+              {credit.map((o) => (
+                <label key={o} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="radio"
+                    name="credit"
+                    value={o}
+                    checked={creditRange === o}
+                    onChange={() => {
+                      setCreditRange(o);
+                      if (errors.creditRange) setErrors((errs) => ({ ...errs, creditRange: "" }));
+                    }}
+                    className="accent-primary h-4 w-4"
+                  />
+                  <span>{o}</span>
+                </label>
+              ))}
+            </div>
           </Q>
         </Section>
 
-        <Section title="Move-In Information">
-          <Q label="Desired move-in date">
+        {/* SECTION 2: MOVE-IN INFORMATION */}
+        <Section id="section-moveInDate" title="Move-In Information">
+          <Q
+            id="q-moveInDate"
+            label="Desired move-in date"
+            required
+            error={errors.moveInDate}
+          >
             <input
+              id="field-moveInDate"
               type="date"
-              required
               value={moveInDate}
-              onChange={(e) => setMoveInDate(e.target.value)}
-              className="spa-field max-w-xs"
+              onChange={(e) => {
+                setMoveInDate(e.target.value);
+                if (errors.moveInDate) setErrors((errs) => ({ ...errs, moveInDate: "" }));
+              }}
+              className={`spa-field max-w-xs font-medium ${
+                errors.moveInDate ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+              }`}
             />
           </Q>
+
           <div className="flex items-center justify-between gap-4">
             <Q label="How many people would live at this rental?" hint="Make sure to include yourself." />
             <div className="flex shrink-0 items-center gap-3">
-              <Button type="button" variant="outline" size="icon" aria-label="Remove one person" onClick={() => setPeople(Math.max(1, people - 1))} className="h-8 w-8 rounded-full border-primary text-primary shadow-none"><Minus /></Button>
-              <span className="w-8 text-center font-semibold">{people}</span>
-              <Button type="button" variant="outline" size="icon" aria-label="Add one person" onClick={() => setPeople(people + 1)} className="h-8 w-8 rounded-full border-primary text-primary shadow-none"><Plus /></Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Remove one person"
+                onClick={() => setPeople(Math.max(1, people - 1))}
+                className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer"
+              >
+                <Minus />
+              </Button>
+              <span className="w-8 text-center font-bold text-base">{people}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Add one person"
+                onClick={() => setPeople(people + 1)}
+                className="h-8 w-8 rounded-full border-primary text-primary shadow-none cursor-pointer"
+              >
+                <Plus />
+              </Button>
             </div>
           </div>
-          <Q label="Do you have any pets?">
-            <Radios name="pets" options={["Yes", "No"]} onChange={(value) => setHasPets(value === "Yes")} />
+
+          <Q
+            id="q-pets"
+            label="Do you have any pets?"
+            required
+            error={errors.pets || errors.petDetails}
+          >
+            <div id="field-pets" className="flex flex-wrap gap-x-6 gap-y-2">
+              {["Yes", "No"].map((option) => (
+                <label key={option} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="radio"
+                    name="pets"
+                    value={option}
+                    checked={petOptionChosen && (hasPets ? option === "Yes" : option === "No")}
+                    onChange={() => {
+                      setPetOptionChosen(true);
+                      setHasPets(option === "Yes");
+                      if (errors.pets) setErrors((errs) => ({ ...errs, pets: "" }));
+                    }}
+                    className="accent-primary h-4 w-4"
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+
             {hasPets && (
-              <div className="mt-4">
-                <label htmlFor="pet-details" className="text-sm font-semibold text-foreground">What Type of Pet(s)?</label>
-                <textarea id="pet-details" name="petDetails" rows={3} maxLength={155} value={petDetails} onChange={(e) => setPetDetails(e.target.value.slice(0, 155))} aria-describedby="pet-character-count" className="spa-field mt-2" />
-                <p id="pet-character-count" className="mt-1 text-xs text-muted-foreground">{petDetails.length} / 155 characters used</p>
+              <div id="field-petDetails" className="mt-4">
+                <label htmlFor="pet-details" className="text-sm font-bold text-foreground">
+                  What Type of Pet(s)? <span className="text-red-600 dark:text-red-400">*</span>
+                </label>
+                <textarea
+                  id="pet-details"
+                  name="petDetails"
+                  rows={3}
+                  maxLength={155}
+                  value={petDetails}
+                  placeholder="e.g. 1 Golden Retriever (45 lbs), 2 years old, trained"
+                  onChange={(e) => {
+                    setPetDetails(e.target.value.slice(0, 155));
+                    if (errors.petDetails) setErrors((errs) => ({ ...errs, petDetails: "" }));
+                  }}
+                  className={`spa-field mt-2 ${
+                    errors.petDetails ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                  }`}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{petDetails.length} / 155 characters used</p>
               </div>
             )}
           </Q>
-          <Q label="Do you smoke?"><Radios name="smoke" options={["Yes", "No", "Outside only"]} onChange={(v) => setSmoking(v)} /></Q>
-          <Q label="Would you be interested in a showing?" hint="See if the landlord will show the rental by video (FaceTime, Zoom, etc.).">
-            <Radios name="show" options={["Yes", "No"]} onChange={(value) => setWantsShowing(value === "Yes")} />
+
+          <Q
+            id="q-smoking"
+            label="Do you smoke?"
+            required
+            error={errors.smoking}
+          >
+            <div id="field-smoking" className="flex flex-wrap gap-x-6 gap-y-2">
+              {["Yes", "No", "Outside only"].map((option) => (
+                <label key={option} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="radio"
+                    name="smoke"
+                    value={option}
+                    checked={smoking === option}
+                    onChange={() => {
+                      setSmoking(option);
+                      if (errors.smoking) setErrors((errs) => ({ ...errs, smoking: "" }));
+                    }}
+                    className="accent-primary h-4 w-4"
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </Q>
+
+          <Q
+            id="q-showing"
+            label="Would you be interested in a showing?"
+            hint="See if the landlord will show the rental by video (FaceTime, Zoom, etc.) or in person."
+            required
+            error={errors.showing || errors.showingTypes}
+          >
+            <div id="field-showing" className="flex flex-wrap gap-x-6 gap-y-2">
+              {["Yes", "No"].map((option) => (
+                <label key={option} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="radio"
+                    name="show"
+                    value={option}
+                    checked={showingOptionChosen && (wantsShowing ? option === "Yes" : option === "No")}
+                    onChange={() => {
+                      setShowingOptionChosen(true);
+                      setWantsShowing(option === "Yes");
+                      if (errors.showing) setErrors((errs) => ({ ...errs, showing: "" }));
+                    }}
+                    className="accent-primary h-4 w-4"
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+
             {wantsShowing && (
-              <fieldset className="mt-4 space-y-3">
-                <legend className="mb-3 text-sm font-semibold text-foreground">Your preferred showing type:</legend>
-                <label className="flex items-start gap-2 text-sm">
+              <fieldset id="field-showingTypes" className="mt-4 space-y-3">
+                <legend className="mb-2 text-sm font-bold text-foreground">
+                  Your preferred showing type: <span className="text-red-600 dark:text-red-400">*</span>
+                </legend>
+                <label className="flex items-start gap-2 text-sm font-medium cursor-pointer">
                   <input
                     type="checkbox"
                     name="showingType"
                     value="in-person"
                     checked={showingTypes.includes("in-person")}
                     onChange={() => handleToggleShowingType("in-person")}
-                    className="mt-1 accent-primary"
+                    className="mt-1 accent-primary h-4 w-4 rounded"
                   />
-                  In-person showing
+                  <span>In-person showing</span>
                 </label>
-                <label className="flex items-start gap-2 text-sm">
+                <label className="flex items-start gap-2 text-sm font-medium cursor-pointer">
                   <input
                     type="checkbox"
                     name="showingType"
                     value="virtual"
                     checked={showingTypes.includes("virtual")}
                     onChange={() => handleToggleShowingType("virtual")}
-                    className="mt-1 accent-primary"
+                    className="mt-1 accent-primary h-4 w-4 rounded"
                   />
-                  Virtual showing (FaceTime, Zoom, etc.)
+                  <span>Virtual showing (FaceTime, Zoom, etc.)</span>
                 </label>
               </fieldset>
             )}
           </Q>
         </Section>
 
-        <Section title="Contact Details">
+        {/* SECTION 3: CONTACT DETAILS */}
+        <Section id="section-contact" title="Contact Details">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Q label="First name"><input required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="spa-field" /></Q>
-            <Q label="Last name"><input required value={lastName} onChange={(e) => setLastName(e.target.value)} className="spa-field" /></Q>
-            <Q label="Email"><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="spa-field" /></Q>
-            <Q label="Phone number"><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="spa-field" /></Q>
+            <Q
+              id="q-firstName"
+              label="First name"
+              required
+              error={errors.firstName}
+            >
+              <input
+                id="field-firstName"
+                value={firstName}
+                placeholder="Jane"
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  if (errors.firstName) setErrors((errs) => ({ ...errs, firstName: "" }));
+                }}
+                className={`spa-field font-medium ${
+                  errors.firstName ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
+              />
+            </Q>
+
+            <Q
+              id="q-lastName"
+              label="Last name"
+              required
+              error={errors.lastName}
+            >
+              <input
+                id="field-lastName"
+                value={lastName}
+                placeholder="Doe"
+                onChange={(e) => {
+                  setLastName(e.target.value);
+                  if (errors.lastName) setErrors((errs) => ({ ...errs, lastName: "" }));
+                }}
+                className={`spa-field font-medium ${
+                  errors.lastName ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
+              />
+            </Q>
+
+            <Q
+              id="q-email"
+              label="Email"
+              required
+              error={errors.email}
+            >
+              <input
+                id="field-email"
+                type="email"
+                value={email}
+                placeholder="jane.doe@example.com"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((errs) => ({ ...errs, email: "" }));
+                }}
+                className={`spa-field font-medium ${
+                  errors.email ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
+              />
+            </Q>
+
+            <Q
+              id="q-phone"
+              label="Phone number"
+              hint="USA 10-digit format only"
+              required
+              error={errors.phone}
+            >
+              <div className="relative">
+                <input
+                  id="field-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  placeholder="(555) 000-0000"
+                  maxLength={14}
+                  className={`spa-field font-medium tracking-wide ${
+                    errors.phone ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground bg-secondary px-1.5 py-0.5 rounded border border-border">
+                  USA
+                </span>
+              </div>
+            </Q>
           </div>
-          <Q label="How did you find this property?">
+
+          <Q id="q-source" label="How did you find this property?">
             <select
+              id="field-source"
               name="source"
               aria-label="How did you find this property?"
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              className="spa-field"
+              className="spa-field font-medium cursor-pointer"
             >
-              <option value=""> </option>
+              <option value="">Select source...</option>
               {[
-                ["CRAIGSLIST", "Craigslist"],
                 ["ZILLOW", "Zillow"],
-                ["MP_ZUMPER", "Zumper"],
-                ["FACEBOOK", "Facebook"],
-                ["MP_APARTMENT_LIST", "Apartment List"],
-                ["MP_REALTOR", "Realtor.com"],
-                ["MP_APARTMENTS", "Apartments.com"],
-                ["MP_CRAIGSLIST", "Craigslist"],
+                ["CRAIGSLIST", "Craigslist"],
+                ["APARTMENTS", "Apartments.com"],
+                ["REALTOR", "Realtor.com"],
+                ["FACEBOOK", "Facebook Marketplace"],
+                ["ZUMPER", "Zumper"],
+                ["APARTMENT_LIST", "Apartment List"],
+                ["HOMES_COM", "Homes.com"],
                 ["RENTLER", "Rentler"],
-                ["MP_HOMES", "Homes.com"],
-                ["MP_HUNT", "Hunt"],
-                ["MP_SHOW_ME_THE_RENT", "Show Me The Rent"],
-                ["MP_ULOOP", "Uloop"],
-                ["MP_COLLEGE_STUDENT_APARTMENTS", "College Student Apartments"],
-                ["APARTMENT_ADVISOR", "Apartment Advisor"],
-                ["MP_COLLEGE_RENTALS", "College Rentals"],
-                ["RENTBERRY", "Rentberry"],
-                ["RENTHOP", "RentHop"],
-                ["MP_DWELLSY", "Dwellsy"],
-                ["MP_RENTAL_SOURCE", "RentalSource"],
-                ["REFERRAL", "Referral"],
-                ["YARD_SIGN", "Yard Sign"],
-                ["OTHER", "Other"],
-                ["RENTAL_BEAST", "Rental Beast"],
-              ].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                ["REFERRAL", "Friend or Family Referral"],
+                ["YARD_SIGN", "Yard Sign / Drove By"],
+                ["OTHER", "Other Source"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </Q>
-          <Q label="Any questions for the landlord? (optional)">
+
+          <Q id="q-questions" label="Any questions for the landlord? (optional)">
             <textarea
+              id="field-questions"
               rows={4}
               value={questions}
+              placeholder="e.g. Is off-street parking included? Are utilities covered?"
               onChange={(e) => setQuestions(e.target.value)}
-              className="spa-field"
+              className="spa-field font-medium"
             />
           </Q>
         </Section>
 
-        <div className="text-center">
-          <Button type="submit" className="h-10 rounded-full px-10 text-xs font-semibold uppercase tracking-[0.2em] shadow-none hover:bg-espresso">
+        {/* Global validation summary alert if errors exist */}
+        {Object.keys(errors).length > 0 && (
+          <div className="rounded-xl border border-red-500/80 bg-red-500/10 p-4 text-xs font-semibold text-red-700 dark:text-red-300 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm">Please complete all required fields above</p>
+              <p className="mt-0.5 text-red-600/90 dark:text-red-400">
+                Sections highlighted in red need your attention before proceeding to the credit verification step.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="text-center pt-2">
+          <Button
+            type="submit"
+            className="h-11 rounded-full px-12 text-xs font-bold uppercase tracking-[0.2em] shadow-md hover:bg-espresso cursor-pointer transition-all"
+          >
             Next
           </Button>
-          <p className="mt-4 text-xs text-muted-foreground">
-            By sending, you agree to our <a className="underline" href="#">Terms of Use</a> &amp; <a className="underline" href="#">Privacy Policy</a>.
+          <p className="mt-4 text-xs text-muted-foreground font-medium">
+            By sending, you agree to our <a className="underline hover:text-foreground" href="#">Terms of Use</a> &amp; <a className="underline hover:text-foreground" href="#">Privacy Policy</a>.
           </p>
         </div>
       </form>
