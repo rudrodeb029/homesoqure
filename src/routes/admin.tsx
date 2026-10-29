@@ -115,6 +115,18 @@ function AdminPage() {
   const [settingsSaveMsg, setSettingsSaveMsg] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // Support Email & Phone PIN Lock state (PIN: 321654)
+  const SETTINGS_PIN = "321654";
+  const [isSettingsUnlocked, setIsSettingsUnlocked] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("homqero_settings_unlocked") === "true";
+    }
+    return false;
+  });
+  const [enteredPin, setEnteredPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [showPin, setShowPin] = useState(false);
+
   // Submissions search & filter state
   const [submissionDateFilter, setSubmissionDateFilter] = useState("");
 
@@ -263,10 +275,35 @@ function AdminPage() {
     }
   };
 
+  const handleUnlockSettings = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (enteredPin.trim() === SETTINGS_PIN) {
+      setIsSettingsUnlocked(true);
+      setPinError("");
+      setEnteredPin("");
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("homqero_settings_unlocked", "true");
+      }
+    } else {
+      setPinError("Incorrect PIN. Please enter the valid 6-digit access PIN.");
+    }
+  };
+
+  const handleLockSettings = () => {
+    setIsSettingsUnlocked(false);
+    setEnteredPin("");
+    setPinError("");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("homqero_settings_unlocked");
+    }
+  };
+
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setIsSettingsUnlocked(false);
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("homqero_admin_session");
+      sessionStorage.removeItem("homqero_settings_unlocked");
     }
   };
 
@@ -645,21 +682,28 @@ function AdminPage() {
             <span>Post New Property</span>
           </button>
 
-          {/* 5. Support Email & Phone Settings */}
+          {/* 5. Support Email & Phone Settings (Protected by PIN) */}
           <button
             type="button"
             onClick={() => {
               setActiveTab("settings");
               setIsCreating(false);
             }}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
               activeTab === "settings"
                 ? "bg-primary text-primary-foreground shadow-xs"
                 : "text-foreground/80 hover:bg-secondary hover:text-foreground"
             }`}
           >
-            <PhoneCall className="h-4 w-4" />
-            <span>Support Email &amp; Phone</span>
+            <div className="flex items-center gap-2.5">
+              <PhoneCall className="h-4 w-4" />
+              <span>Support Email &amp; Phone</span>
+            </div>
+            {!isSettingsUnlocked ? (
+              <Lock className="h-3.5 w-3.5 text-muted-foreground opacity-80" />
+            ) : (
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+            )}
           </button>
 
           {/* 6. Password & Security */}
@@ -723,7 +767,9 @@ function AdminPage() {
           <div>
             <h1 className="font-serif text-2xl font-bold leading-tight">
               {activeTab === "settings"
-                ? "Support Email & Phone Configuration"
+                ? !isSettingsUnlocked
+                  ? "Support Email & Phone (Locked)"
+                  : "Support Email & Phone Configuration"
                 : activeTab === "security"
                 ? "Password & Security Settings"
                 : activeTab === "chat"
@@ -736,7 +782,9 @@ function AdminPage() {
             </h1>
             <p className="text-xs text-muted-foreground font-medium">
               {activeTab === "settings"
-                ? "Configure the official support phone number and landlord email address across your website and tenant applications."
+                ? !isSettingsUnlocked
+                  ? "Enter your 6-digit security PIN to view and edit support phone, email, and credit check links."
+                  : "Configure the official support phone number and landlord email address across your website and tenant applications."
                 : activeTab === "security"
                 ? "Manage your admin portal access password."
                 : activeTab === "chat"
@@ -992,40 +1040,62 @@ function AdminPage() {
                   </div>
                 </div>
 
-                {/* Custom Links & Contacts */}
+                {/* Custom Links & Contacts (Not editable on Post New Property) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-foreground">
-                      Custom Credit Check Link <span className="font-normal text-muted-foreground">(Optional affiliate link)</span>
+                    <label className="block text-xs font-semibold mb-1 text-foreground flex items-center justify-between">
+                      <span>Custom Credit Check Link</span>
+                      <span className="text-[0.68rem] text-muted-foreground font-normal flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> Not editable
+                      </span>
                     </label>
                     <input
-                      placeholder={settingsCreditCheckUrl || "https://creditcheck.example.com/ref"}
-                      value={creditCheckUrl}
-                      onChange={(e) => setCreditCheckUrl(e.target.value)}
-                      className="spa-field"
+                      readOnly
+                      tabIndex={-1}
+                      placeholder={settingsCreditCheckUrl || siteSettings.creditCheckUrl || "https://creditcheck.example.com/ref"}
+                      value={creditCheckUrl || settingsCreditCheckUrl || siteSettings.creditCheckUrl || ""}
+                      className="spa-field bg-secondary/70 cursor-not-allowed text-muted-foreground border-border/80 select-none focus:ring-0 focus:outline-none"
                     />
                     <p className="mt-1 text-[0.68rem] text-muted-foreground">
                       Auto-filled from Support Email &amp; Phone settings.
                     </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-foreground">Support Contact Phone</label>
+                    <label className="block text-xs font-semibold mb-1 text-foreground flex items-center justify-between">
+                      <span>Support Contact Phone</span>
+                      <span className="text-[0.68rem] text-muted-foreground font-normal flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> Not editable
+                      </span>
+                    </label>
                     <input
+                      readOnly
+                      tabIndex={-1}
                       placeholder="+1 (646) 431-3060"
-                      value={supportPhone}
-                      onChange={(e) => setSupportPhone(e.target.value)}
-                      className="spa-field"
+                      value={supportPhone || settingsSupportPhone || siteSettings.supportPhone || "+1 (646) 431-3060"}
+                      className="spa-field bg-secondary/70 cursor-not-allowed text-muted-foreground border-border/80 select-none focus:ring-0 focus:outline-none"
                     />
+                    <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                      Auto-filled from Support Email &amp; Phone settings.
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-foreground">Support / Landlord Email</label>
+                    <label className="block text-xs font-semibold mb-1 text-foreground flex items-center justify-between">
+                      <span>Support / Landlord Email</span>
+                      <span className="text-[0.68rem] text-muted-foreground font-normal flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> Not editable
+                      </span>
+                    </label>
                     <input
                       type="email"
+                      readOnly
+                      tabIndex={-1}
                       placeholder="landlord@homqero.com"
-                      value={supportEmail}
-                      onChange={(e) => setSupportEmail(e.target.value)}
-                      className="spa-field"
+                      value={supportEmail || settingsSupportEmail || siteSettings.supportEmail || "landlord@homqero.com"}
+                      className="spa-field bg-secondary/70 cursor-not-allowed text-muted-foreground border-border/80 select-none focus:ring-0 focus:outline-none"
                     />
+                    <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                      Auto-filled from Support Email &amp; Phone settings.
+                    </p>
                   </div>
                 </div>
 
@@ -1763,14 +1833,92 @@ function AdminPage() {
           )}
 
           {/* ------------------------------------------------------- */}
-          {/* VIEW: SUPPORT EMAIL & PHONE SETTINGS */}
+          {/* VIEW: SUPPORT EMAIL & PHONE SETTINGS (PIN PROTECTED) */}
           {/* ------------------------------------------------------- */}
-          {activeTab === "settings" && (
+          {activeTab === "settings" && !isSettingsUnlocked && (
+            <div className="max-w-md mx-auto my-12">
+              <div className="rounded-2xl border border-border bg-card p-8 shadow-sm text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Lock className="h-7 w-7" />
+                </div>
+                <h2 className="font-serif text-2xl font-bold text-foreground">
+                  Support Settings Locked
+                </h2>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                  Enter the 6-digit security PIN to unlock and view or edit the Support Email, Phone, and Custom Credit Check configuration.
+                </p>
+
+                <form onSubmit={handleUnlockSettings} className="mt-6 space-y-4">
+                  <div className="relative">
+                    <input
+                      type={showPin ? "text" : "password"}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      autoFocus
+                      placeholder="••••••"
+                      value={enteredPin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        setEnteredPin(val);
+                        if (pinError) setPinError("");
+                        if (val === SETTINGS_PIN) {
+                          setIsSettingsUnlocked(true);
+                          setPinError("");
+                          setEnteredPin("");
+                          if (typeof window !== "undefined") {
+                            sessionStorage.setItem("homqero_settings_unlocked", "true");
+                          }
+                        }
+                      }}
+                      className="spa-field text-center font-mono text-2xl tracking-[0.35em] font-bold py-3 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      title={showPin ? "Hide PIN" : "Show PIN"}
+                    >
+                      {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  {pinError && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs font-semibold text-red-600 dark:text-red-400 flex items-center justify-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{pinError}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={enteredPin.length < 6}
+                    className="w-full rounded-full bg-primary py-3 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer disabled:opacity-50 shadow-sm"
+                  >
+                    Unlock &amp; Open Page
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "settings" && isSettingsUnlocked && (
             <div className="max-w-2xl space-y-6">
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
-                  <PhoneCall className="h-5 w-5 text-primary" />
-                  <h2 className="font-serif text-xl font-bold">Edit Support Phone &amp; Email</h2>
+                <div className="flex items-center justify-between gap-2 mb-4 border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <PhoneCall className="h-5 w-5 text-primary" />
+                    <h2 className="font-serif text-xl font-bold">Edit Support Phone &amp; Email</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLockSettings}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
+                    title="Lock Support Settings"
+                  >
+                    <Lock className="h-3.5 w-3.5" />
+                    <span>Lock Page</span>
+                  </button>
                 </div>
                 <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
                   Configure the primary support phone number and landlord email address. These details appear on the website header and determine where tenant applications and deep analysis reports are delivered.
