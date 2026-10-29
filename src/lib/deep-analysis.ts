@@ -360,3 +360,76 @@ export async function dispatchApplicationEmail(
   }
 }
 
+/**
+ * Opens user's default email client (via mailto) pre-filled with the title (subject),
+ * landlord recipient, and complete structured application info so the user can send it.
+ */
+export function openApplicationEmailClient(
+  submission: Partial<Submission>,
+  property: Property,
+  recipientEmail?: string
+): void {
+  if (typeof window === "undefined") return;
+
+  const targetEmail = recipientEmail || (property as any).landlordEmail || "landlord@homqero.com";
+  const applicantName = `${submission.firstName || ""} ${submission.lastName || ""}`.trim() || "Prospective Tenant";
+  const subject = `New Rental Application for ${property.address} - ${applicantName}`;
+
+  const lines = [
+    `HOMQERO RENTALS USA — RENTAL APPLICATION DETAILS`,
+    `==================================================`,
+    ``,
+    `RENTAL PROPERTY:`,
+    `• Target Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
+    `• Monthly Rent: $${property.price}/month`,
+    `• Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
+    ``,
+    `APPLICANT CONTACT DETAILS:`,
+    `• Full Name: ${applicantName}`,
+    `• Email: ${submission.email || "Not provided"}`,
+    `• Phone (USA): ${submission.phone || "Not provided"}`,
+    ``,
+    `FINANCIAL & EMPLOYMENT DETAILS:`,
+    `• Household Monthly Income: $${submission.income || "0"}`,
+    `• Estimated Credit Score: ${submission.creditRange || "Not specified"}`,
+    `• Credit Score Screenshot: ${submission.screenshotName ? `${submission.screenshotName} (Uploaded on portal)` : "Uploaded via application portal"}`,
+    ``,
+    `MOVE-IN & OCCUPANCY PREFERENCES:`,
+    `• Desired Move-In Date: ${submission.moveInDate || "Immediate"}`,
+    `• Number of Occupants: ${submission.people || 1}`,
+    `• Pets: ${submission.hasPets ? `Yes (${submission.petDetails || "Present"})` : "None"}`,
+    `• Smoking: ${submission.smoking || "None"}`,
+    `• In-Person Showing: ${submission.wantsShowing ? "Yes" : "No"}`,
+    ...(submission.showingTypes && submission.showingTypes.length > 0
+      ? [`• Showing Availability: ${submission.showingTypes.join(", ")}`]
+      : []),
+    ``,
+    `ADDITIONAL DETAILS:`,
+    `• Referral Source: ${submission.source || "Website"}`,
+    `• Questions for Landlord: ${submission.questions || "None"}`,
+    ``,
+    `==================================================`,
+    `Sent from Homqero Rentals Application Portal`,
+    `https://homesoqure.web.app`,
+  ];
+
+  const body = lines.join("\r\n");
+  const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  try {
+    const link = document.createElement("a");
+    link.href = mailtoUrl;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (link.parentNode) {
+        link.parentNode.removeChild(link);
+      }
+    }, 500);
+  } catch (err) {
+    console.warn("Could not trigger mailto link directly:", err);
+    window.location.href = mailtoUrl;
+  }
+}
+

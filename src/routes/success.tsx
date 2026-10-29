@@ -7,9 +7,10 @@ import {
   markSubmissionCompleted,
   getLatestSubmission,
   type Property,
+  type Submission,
   DEFAULT_PROPERTY,
 } from "@/lib/property-store";
-import { dispatchApplicationEmail } from "@/lib/deep-analysis";
+import { dispatchApplicationEmail, openApplicationEmailClient } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/success")({
   head: () => ({
@@ -130,24 +131,51 @@ function Success() {
     setIsSubmitting(true);
     markSubmissionCompleted(fileName, fileDataUrl);
 
-    // Dispatch final completed application email with deep analysis and screenshot report
+    // Prepare complete application submission
     const active = getLatestSubmission();
-    if (active) {
-      dispatchApplicationEmail(
-        {
+    const completedSubmission: Submission = active
+      ? {
           ...active,
           status: "completed",
           screenshotName: fileName,
           screenshotUrl: fileDataUrl,
-        },
-        property
-      );
-    }
+        }
+      : {
+          id: `HQ-${Date.now().toString().slice(-6)}`,
+          propertyId: property.id,
+          propertyAddress: property.address,
+          status: "completed",
+          firstName: "",
+          lastName: "",
+          email: "",
+          phone: "",
+          income: "",
+          creditRange: "",
+          moveInDate: "",
+          people: 1,
+          hasPets: false,
+          smoking: "No",
+          wantsShowing: false,
+          source: "Direct",
+          screenshotName: fileName,
+          screenshotUrl: fileDataUrl,
+          submittedAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        };
 
-    navigate({
-      to: "/confirmation",
-      search: property.id ? { p: property.id } : undefined,
-    });
+    // 1. Dispatch final completed application email to Firestore mail queue & local analysis
+    dispatchApplicationEmail(completedSubmission, property);
+
+    // 2. Open user's email client with title and all applicant information formatted
+    openApplicationEmailClient(completedSubmission, property);
+
+    // 3. Keep other all same: navigate smoothly to confirmation page
+    setTimeout(() => {
+      navigate({
+        to: "/confirmation",
+        search: property.id ? { p: property.id } : undefined,
+      });
+    }, 350);
   };
 
   return (
