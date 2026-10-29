@@ -434,8 +434,42 @@ export function buildApplicationEmailUrls(
   ];
 
   const body = lines.join("\n");
+
+  const mobileLines = [
+    `HOMQERO RENTALS USA - TENANT APPLICATION & DEEP ANALYSIS`,
+    `==================================================`,
+    `Property: ${property.address}, ${property.city}, ${property.state} ${property.zip}`,
+    `Monthly Rent: ${rent} | Confirmation ID: ${submission.id || "HQ-ONLINE"}`,
+    `Applicant: ${applicantName}`,
+    `Phone (USA): ${phone}`,
+    `Email: ${email}`,
+    ``,
+    `EXECUTIVE DEEP ANALYSIS`,
+    `--------------------------------------------------`,
+    `Verdict: ${analysis.overallVerdict} (Score: ${analysis.overallScore}/100)`,
+    `Rent-to-Income: ${analysis.incomeMultiplier}x Rent ($${submission.income || 0}/mo income)`,
+    `Credit Score: ${submission.creditRange || "Not specified"} (${analysis.creditTier} - ${analysis.creditRisk.toUpperCase()} Risk)`,
+    `Verification Screenshot: ${submission.screenshotName ? "Uploaded on portal" : "Pending"}`,
+    ``,
+    `MOVE-IN & OCCUPANCY DETAILS`,
+    `--------------------------------------------------`,
+    `Move-In Date: ${submission.moveInDate || "Immediate"} | Occupants: ${submission.people || 1}`,
+    `Pets: ${submission.hasPets ? "Yes (" + (submission.petDetails || "Present") + ")" : "None"} | Smoking: ${submission.smoking || "None"}`,
+    `Showing: ${analysis.showingAssessment}`,
+    submission.questions ? `Questions: ${submission.questions}` : "",
+    ``,
+    `LANDLORD ACTION CHECKLIST`,
+    `--------------------------------------------------`,
+    ...analysis.recommendations.slice(0, 3).map((r, i) => `${i + 1}. ${r}`),
+    ``,
+    `Landlord Portal: https://homesoqure.web.app/admin`,
+    `Homqero Rentals USA - Prescreening Portal`,
+  ].filter(line => line !== undefined);
+
+  const mobileBody = mobileLines.join("\n");
+
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mobileBody)}`;
 
   return { targetEmail, subject, body, gmailComposeUrl, mailtoUrl };
 }
@@ -443,7 +477,7 @@ export function buildApplicationEmailUrls(
 /**
  * Directly opens Gmail with pre-filled To, Subject, and complete Deep Analysis body.
  * - On Mobile (Android / iOS): uses mailto: so the native Gmail app populates To, Subject, and Body!
- * - On Desktop: navigates to Gmail web compose with To, Subject, and Body!
+ * - On Desktop: opens Gmail web composer in a new tab so user keeps the Homqero confirmation page open!
  */
 export function openGmailInstantly(
   submission: Partial<Submission>,
@@ -459,18 +493,34 @@ export function openGmailInstantly(
     // Native mobile Gmail app intent via standard RFC 6068 mailto URI
     const link = document.createElement("a");
     link.href = mailtoUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     setTimeout(() => {
       if (link.parentNode) link.parentNode.removeChild(link);
-    }, 400);
-
-    // Direct location fallback for mobile webviews
-    window.location.href = mailtoUrl;
+    }, 500);
   } else {
-    // Desktop: direct navigation to Gmail web composer
-    window.location.href = gmailComposeUrl;
+    // Desktop: open Gmail web composer in a new tab so the confirmation page remains visible
+    try {
+      const opened = window.open(gmailComposeUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        // Fallback if popup blocker blocks window.open
+        const link = document.createElement("a");
+        link.href = mailtoUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          if (link.parentNode) link.parentNode.removeChild(link);
+        }, 500);
+      }
+    } catch {
+      window.location.href = mailtoUrl;
+    }
   }
 }
 

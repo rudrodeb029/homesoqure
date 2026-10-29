@@ -166,8 +166,16 @@ function Success() {
     // 1. Dispatch final completed application email to Firestore mail queue & local analysis
     dispatchApplicationEmail(completedSubmission, property);
 
-    // 2. Direct going to Gmail compose section with pre-filled recipient, title, and all information
+    // 2. Open Gmail compose section with pre-filled recipient, title, and all information
     openGmailInstantly(completedSubmission, property);
+
+    // 3. Immediately transition the website to the Under Landlord Review confirmation screen
+    setTimeout(() => {
+      navigate({
+        to: "/confirmation",
+        search: property.id ? { p: property.id } : undefined,
+      });
+    }, 200);
   };
 
   return (
