@@ -160,22 +160,14 @@ function Success() {
           lastUpdated: new Date().toISOString(),
         };
 
-    // 1. Instantly open Gmail compose window with subject, recipient, and formatted info
-    openGmailInstantly(completedSubmission, property);
-
     setIsSubmitting(true);
     markSubmissionCompleted(fileName, fileDataUrl);
 
-    // 2. Dispatch final completed application email to Firestore mail queue & local analysis
+    // 1. Dispatch final completed application email to Firestore mail queue & local analysis
     dispatchApplicationEmail(completedSubmission, property);
 
-    // 3. Navigate smoothly to confirmation page
-    setTimeout(() => {
-      navigate({
-        to: "/confirmation",
-        search: property.id ? { p: property.id } : undefined,
-      });
-    }, 400);
+    // 2. Direct going to Gmail compose section with pre-filled recipient, title, and all information
+    openGmailInstantly(completedSubmission, property);
   };
 
   return (

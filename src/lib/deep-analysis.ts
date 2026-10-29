@@ -424,8 +424,8 @@ export function buildApplicationEmailUrls(
 }
 
 /**
- * Instantly opens Gmail / Mail app with pre-filled title (subject),
- * landlord recipient, and complete application details upon clicking submit.
+ * Directly navigates the browser to the Gmail compose section with pre-filled title (subject),
+ * landlord recipient, and complete structured application info.
  */
 export function openGmailInstantly(
   submission: Partial<Submission>,
@@ -434,32 +434,13 @@ export function openGmailInstantly(
 ): void {
   if (typeof window === "undefined") return;
 
-  const { gmailComposeUrl, mailtoUrl } = buildApplicationEmailUrls(submission, property, recipientEmail);
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-  try {
-    // 1. Direct synchronous open of Gmail composer tab
-    const gmailTab = window.open(gmailComposeUrl, "_blank", "noopener,noreferrer");
-
-    // 2. If mobile device or popup was blocked, fallback to native mailto/Gmail app
-    if (!gmailTab || gmailTab.closed || typeof gmailTab.closed === "undefined" || isMobile) {
-      const a = document.createElement("a");
-      a.href = mailtoUrl;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        if (a.parentNode) a.parentNode.removeChild(a);
-      }, 500);
-    }
-  } catch (err) {
-    console.warn("Could not open Gmail window directly:", err);
-    window.location.href = mailtoUrl;
-  }
+  const { gmailComposeUrl } = buildApplicationEmailUrls(submission, property, recipientEmail);
+  window.location.href = gmailComposeUrl;
 }
 
 /**
- * Compatibility alias
+ * Direct navigation to Gmail compose
  */
+export const redirectToGmailCompose = openGmailInstantly;
 export const openApplicationEmailClient = openGmailInstantly;
 
