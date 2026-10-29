@@ -66,26 +66,26 @@ export function LiveChatWidget() {
 
   return (
     <div className="fixed bottom-5 right-5 z-40">
-      {/* Floating Chat Trigger Button */}
+      {/* Floating Chat Trigger Button - Icon Only */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2.5 rounded-full bg-espresso px-4 py-3 text-primary-foreground shadow-xl transition-all duration-200 hover:scale-105 hover:bg-espresso/90 focus:outline-none cursor-pointer border border-border/40"
-          aria-label="Open live chat with landlord"
+          className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-espresso text-accent shadow-2xl transition-all duration-200 hover:scale-110 hover:shadow-[0_10px_25px_rgba(38,23,15,0.4)] active:scale-95 focus:outline-none cursor-pointer border border-accent/40"
+          aria-label="Open live chat"
+          title="Chat with Landlord"
         >
-          {/* Online green indicator dot */}
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </span>
+          <MessageCircle className="h-6 w-6 text-accent transition-transform duration-200 group-hover:scale-110" />
 
-          <MessageCircle className="h-5 w-5 text-accent" />
-          <span className="text-xs font-bold tracking-wide">Chat with Landlord</span>
+          {/* Green online presence indicator */}
+          <span className="absolute bottom-1 right-1 flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-espresso" />
+          </span>
 
           {/* Unread Message Notification Dot */}
           {hasUnread && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[0.65rem] font-bold text-white shadow-md animate-bounce">
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[0.65rem] font-bold text-white shadow-md animate-bounce ring-2 ring-background">
               !
             </span>
           )}
