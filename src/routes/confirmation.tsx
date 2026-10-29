@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { SpaShell } from "@/components/SpaShell";
-import { Check, Clock, Home, MessageCircle, Mail } from "@/lib/lucide-react";
+import { Check, Clock, Home, MessageCircle } from "@/lib/lucide-react";
 import { getPropertyById, getLatestSubmission, type Property, type Submission, DEFAULT_PROPERTY } from "@/lib/property-store";
-import { openApplicationEmailClient } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/confirmation")({
   head: () => ({
@@ -151,26 +150,6 @@ export function ConfirmationPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Email Dispatched & Manual Re-open */}
-        <div className="rounded-xl border border-primary/20 bg-secondary/50 p-5 text-center">
-          <p className="font-bold text-sm text-foreground">Application Email Prepared for Landlord</p>
-          <p className="mt-1 text-xs text-muted-foreground font-medium">
-            Your email client was opened with your application details and subject line pre-filled. If you need to re-open or send it again, tap below:
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              if (submission) {
-                openApplicationEmailClient(submission, property);
-              }
-            }}
-            className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            <span>Open Email in Mail App</span>
-          </button>
         </div>
 
         {/* Live Chat prompt card */}

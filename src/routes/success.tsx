@@ -10,7 +10,7 @@ import {
   type Submission,
   DEFAULT_PROPERTY,
 } from "@/lib/property-store";
-import { dispatchApplicationEmail, openApplicationEmailClient } from "@/lib/deep-analysis";
+import { dispatchApplicationEmail } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/success")({
   head: () => ({
@@ -166,16 +166,11 @@ function Success() {
     // 1. Dispatch final completed application email to Firestore mail queue & local analysis
     dispatchApplicationEmail(completedSubmission, property);
 
-    // 2. Open user's email client with title and all applicant information formatted
-    openApplicationEmailClient(completedSubmission, property);
-
-    // 3. Keep other all same: navigate smoothly to confirmation page
-    setTimeout(() => {
-      navigate({
-        to: "/confirmation",
-        search: property.id ? { p: property.id } : undefined,
-      });
-    }, 350);
+    // 2. Navigate smoothly to confirmation page (without opening external mail apps)
+    navigate({
+      to: "/confirmation",
+      search: property.id ? { p: property.id } : undefined,
+    });
   };
 
   return (
