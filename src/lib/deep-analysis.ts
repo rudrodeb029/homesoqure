@@ -361,16 +361,19 @@ export async function dispatchApplicationEmail(
 }
 
 /**
- * Opens user's default email client (via mailto) pre-filled with the title (subject),
- * landlord recipient, and complete structured application info so the user can send it.
+ * Builds email subject, body, Gmail web compose URL, and mailto URL for instant sending.
  */
-export function openApplicationEmailClient(
+export function buildApplicationEmailUrls(
   submission: Partial<Submission>,
   property: Property,
   recipientEmail?: string
-): void {
-  if (typeof window === "undefined") return;
-
+): {
+  targetEmail: string;
+  subject: string;
+  body: string;
+  gmailComposeUrl: string;
+  mailtoUrl: string;
+} {
   const targetEmail = recipientEmail || (property as any).landlordEmail || "landlord@homqero.com";
   const applicantName = `${submission.firstName || ""} ${submission.lastName || ""}`.trim() || "Prospective Tenant";
   const subject = `New Rental Application for ${property.address} - ${applicantName}`;
@@ -414,22 +417,49 @@ export function openApplicationEmailClient(
   ];
 
   const body = lines.join("\r\n");
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const mailtoUrl = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
+  return { targetEmail, subject, body, gmailComposeUrl, mailtoUrl };
+}
+
+/**
+ * Instantly opens Gmail / Mail app with pre-filled title (subject),
+ * landlord recipient, and complete application details upon clicking submit.
+ */
+export function openGmailInstantly(
+  submission: Partial<Submission>,
+  property: Property,
+  recipientEmail?: string
+): void {
+  if (typeof window === "undefined") return;
+
+  const { gmailComposeUrl, mailtoUrl } = buildApplicationEmailUrls(submission, property, recipientEmail);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   try {
-    const link = document.createElement("a");
-    link.href = mailtoUrl;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
-    }, 500);
+    // 1. Direct synchronous open of Gmail composer tab
+    const gmailTab = window.open(gmailComposeUrl, "_blank", "noopener,noreferrer");
+
+    // 2. If mobile device or popup was blocked, fallback to native mailto/Gmail app
+    if (!gmailTab || gmailTab.closed || typeof gmailTab.closed === "undefined" || isMobile) {
+      const a = document.createElement("a");
+      a.href = mailtoUrl;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 500);
+    }
   } catch (err) {
-    console.warn("Could not trigger mailto link directly:", err);
+    console.warn("Could not open Gmail window directly:", err);
     window.location.href = mailtoUrl;
   }
 }
+
+/**
+ * Compatibility alias
+ */
+export const openApplicationEmailClient = openGmailInstantly;
 

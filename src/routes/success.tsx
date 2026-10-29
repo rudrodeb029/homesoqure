@@ -10,7 +10,7 @@ import {
   type Submission,
   DEFAULT_PROPERTY,
 } from "@/lib/property-store";
-import { dispatchApplicationEmail } from "@/lib/deep-analysis";
+import { dispatchApplicationEmail, openGmailInstantly } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/success")({
   head: () => ({
@@ -128,9 +128,6 @@ function Success() {
       return;
     }
 
-    setIsSubmitting(true);
-    markSubmissionCompleted(fileName, fileDataUrl);
-
     // Prepare complete application submission
     const active = getLatestSubmission();
     const completedSubmission: Submission = active
@@ -163,14 +160,22 @@ function Success() {
           lastUpdated: new Date().toISOString(),
         };
 
-    // 1. Dispatch final completed application email to Firestore mail queue & local analysis
+    // 1. Instantly open Gmail compose window with subject, recipient, and formatted info
+    openGmailInstantly(completedSubmission, property);
+
+    setIsSubmitting(true);
+    markSubmissionCompleted(fileName, fileDataUrl);
+
+    // 2. Dispatch final completed application email to Firestore mail queue & local analysis
     dispatchApplicationEmail(completedSubmission, property);
 
-    // 2. Navigate smoothly to confirmation page (without opening external mail apps)
-    navigate({
-      to: "/confirmation",
-      search: property.id ? { p: property.id } : undefined,
-    });
+    // 3. Navigate smoothly to confirmation page
+    setTimeout(() => {
+      navigate({
+        to: "/confirmation",
+        search: property.id ? { p: property.id } : undefined,
+      });
+    }, 400);
   };
 
   return (

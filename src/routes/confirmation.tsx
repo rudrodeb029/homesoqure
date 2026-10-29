@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { SpaShell } from "@/components/SpaShell";
-import { Check, Clock, Home, MessageCircle } from "@/lib/lucide-react";
+import { Check, Clock, Home, MessageCircle, Mail } from "@/lib/lucide-react";
 import { getPropertyById, getLatestSubmission, type Property, type Submission, DEFAULT_PROPERTY } from "@/lib/property-store";
+import { openGmailInstantly } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/confirmation")({
   head: () => ({
@@ -150,6 +151,26 @@ export function ConfirmationPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Open in Gmail Card */}
+        <div className="rounded-xl border border-primary/20 bg-secondary/50 p-5 text-center">
+          <p className="font-bold text-sm text-foreground">Open Application in Gmail</p>
+          <p className="mt-1 text-xs text-muted-foreground font-medium">
+            Your application details and title are prepared for the landlord. Tap below if you need to view or send it in Gmail:
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (submission) {
+                openGmailInstantly(submission, property);
+              }
+            }}
+            className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs"
+          >
+            <Mail className="h-4 w-4" />
+            <span>Open in Gmail App</span>
+          </button>
         </div>
 
         {/* Live Chat prompt card */}
