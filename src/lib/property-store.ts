@@ -10,6 +10,10 @@ export interface Property {
   supportPhone?: string;
   supportEmail?: string;
   notes?: string;
+  /** Worker who posted this property (undefined = Admin) */
+  ownerId?: string;
+  ownerName?: string;
+  referralCode?: string;
   createdAt: string;
 }
 
@@ -60,6 +64,10 @@ export interface Submission {
   questions?: string;
   screenshotName?: string;
   screenshotUrl?: string;
+  /** Worker attribution (copied from the property / ?ref= link) */
+  ownerId?: string;
+  ownerName?: string;
+  referralCode?: string;
   submittedAt: string;
   lastUpdated: string;
 }
@@ -368,6 +376,9 @@ export function saveOrUpdateDraftLead(draft: Partial<Submission>): Submission | 
       questions: draft.questions || "",
       screenshotName: draft.screenshotName || "",
       screenshotUrl: draft.screenshotUrl || "",
+      ownerId: draft.ownerId,
+      ownerName: draft.ownerName,
+      referralCode: draft.referralCode,
       submittedAt: now,
       lastUpdated: now,
     };

@@ -121,10 +121,14 @@ function Index() {
 
   // Validation error state
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Worker referral code from share link (?ref=CODE)
+  const [refCode, setRefCode] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref) setRefCode(ref.trim().toUpperCase());
       const propId = params.get("p") || params.get("property");
       const loaded = getPropertyById(propId);
       setProperty(loaded);
@@ -141,6 +145,9 @@ function Index() {
     saveOrUpdateDraftLead({
       propertyId: property.id,
       propertyAddress: property.address,
+      ownerId: property.ownerId,
+      ownerName: property.ownerName,
+      referralCode: property.referralCode || refCode || undefined,
       firstName,
       lastName,
       email,
@@ -319,6 +326,9 @@ function Index() {
     const submissionData = {
       propertyId: property.id,
       propertyAddress: property.address,
+      ownerId: property.ownerId,
+      ownerName: property.ownerName,
+      referralCode: property.referralCode || refCode || undefined,
       firstName,
       lastName,
       email,

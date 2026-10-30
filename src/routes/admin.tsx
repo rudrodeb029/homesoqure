@@ -60,6 +60,14 @@ import {
   dispatchApplicationEmail,
   type TenantAnalysisReport,
 } from "@/lib/deep-analysis";
+import {
+  subscribeToWorkers,
+  createWorker,
+  updateWorker,
+  deleteWorker,
+  getWorkers,
+  type Worker,
+} from "@/lib/worker-store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -78,7 +86,7 @@ function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Tab state: "properties" | "submissions" | "chat" | "settings" | "security"
-  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "chat" | "settings" | "security">("properties");
+  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "chat" | "workers" | "settings" | "security">("properties");
   const [submissionFilter, setSubmissionFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
   const [selectedScreenshotModal, setSelectedScreenshotModal] = useState<{
     url: string;
@@ -129,6 +137,16 @@ function AdminPage() {
 
   // Submissions search & filter state
   const [submissionDateFilter, setSubmissionDateFilter] = useState("");
+
+  // Workers & Referrals state
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workerFilter, setWorkerFilter] = useState<string>("all"); // "all" | "admin" | workerId
+  const [newWorkerName, setNewWorkerName] = useState("");
+  const [newWorkerUsername, setNewWorkerUsername] = useState("");
+  const [newWorkerPassword, setNewWorkerPassword] = useState("");
+  const [newWorkerPhone, setNewWorkerPhone] = useState("");
+  const [workerMsg, setWorkerMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -234,6 +252,62 @@ function AdminPage() {
     });
     return () => unsubChats();
   }, [isAuthenticated]);
+
+  // Real-time Workers Listener
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setWorkers(getWorkers());
+    const unsubWorkers = subscribeToWorkers(setWorkers);
+    return () => unsubWorkers();
+  }, [isAuthenticated]);
+
+  const handleCreateWorker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWorkerMsg(null);
+    if (!newWorkerName.trim() || !newWorkerUsername.trim() || newWorkerPassword.length < 4) {
+      setWorkerMsg({ type: "err", text: "Name, username and a password (min 4 characters) are required." });
+      return;
+    }
+    try {
+      const w = await createWorker({
+        name: newWorkerName,
+        username: newWorkerUsername,
+        password: newWorkerPassword,
+        phone: newWorkerPhone,
+      });
+      setWorkers(getWorkers());
+      setNewWorkerName("");
+      setNewWorkerUsername("");
+      setNewWorkerPassword("");
+      setNewWorkerPhone("");
+      setWorkerMsg({ type: "ok", text: `✓ Worker "${w.name}" created. Referral code: ${w.referralCode}` });
+    } catch (err) {
+      setWorkerMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to create worker." });
+    }
+  };
+
+  const handleToggleWorker = async (w: Worker) => {
+    await updateWorker(w.id, { active: !w.active });
+    setWorkers(getWorkers());
+  };
+
+  const handleResetWorkerPassword = async (w: Worker) => {
+    const pwd = prompt(`Enter a new password for ${w.name} (min 4 characters):`);
+    if (!pwd) return;
+    if (pwd.length < 4) {
+      alert("Password must be at least 4 characters.");
+      return;
+    }
+    await updateWorker(w.id, { password: pwd });
+    setWorkers(getWorkers());
+    alert(`Password updated for ${w.name}.`);
+  };
+
+  const handleDeleteWorker = async (w: Worker) => {
+    if (!confirm(`Delete worker "${w.name}"? Their posts and leads will remain and show their name.`)) return;
+    await deleteWorker(w.id);
+    setWorkers(getWorkers());
+  };
 
   // Real-time Active Chat Messages Listener
   useEffect(() => {
@@ -447,8 +521,8 @@ function AdminPage() {
     return `${window.location.origin}/?p=${propertyId}`;
   };
 
-  const copyToClipboard = (propertyId: string) => {
-    const link = getFullShareLink(propertyId);
+  const copyToClipboard = (propertyId: string, customLink?: string) => {
+    const link = customLink || getFullShareLink(propertyId);
     navigator.clipboard.writeText(link);
     setCopiedId(propertyId);
     setTimeout(() => setCopiedId(null), 2500);
@@ -459,7 +533,18 @@ function AdminPage() {
   const incompleteCount = submissions.filter((s) => s.status === "incomplete").length;
   const unreadChatsCount = chatThreads.reduce((sum, t) => sum + (t.unreadAdminCount > 0 ? 1 : 0), 0);
 
+  const matchesWorkerFilter = (ownerId?: string) => {
+    if (workerFilter === "all") return true;
+    if (workerFilter === "admin") return !ownerId;
+    return ownerId === workerFilter;
+  };
+
+  const filteredProperties = properties.filter((p) => matchesWorkerFilter(p.ownerId));
+
   const filteredSubmissions = submissions.filter((s) => {
+    if (!matchesWorkerFilter(s.ownerId)) {
+      return false;
+    }
     if (submissionFilter !== "all" && s.status !== submissionFilter) {
       return false;
     }
@@ -682,6 +767,34 @@ function AdminPage() {
             <span>Post New Property</span>
           </button>
 
+          {/* 5. Workers & Referrals */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("workers");
+              setIsCreating(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === "workers"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-foreground/80 hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Share2 className="h-4 w-4" />
+              <span>Workers &amp; Referrals</span>
+            </div>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${
+                activeTab === "workers"
+                  ? "bg-primary-foreground/20 text-primary-foreground"
+                  : "bg-secondary text-foreground"
+              }`}
+            >
+              {workers.length}
+            </span>
+          </button>
+
           {/* 5. Support Email & Phone Settings (Protected by PIN) */}
           <button
             type="button"
@@ -772,6 +885,8 @@ function AdminPage() {
                   : "Support Email & Phone Configuration"
                 : activeTab === "security"
                 ? "Password & Security Settings"
+                : activeTab === "workers"
+                ? "Worker Referral Accounts & Performance"
                 : activeTab === "chat"
                 ? "Live Landlord Chat Support"
                 : activeTab === "submissions"
@@ -787,6 +902,8 @@ function AdminPage() {
                   : "Configure the official support phone number and landlord email address across your website and tenant applications."
                 : activeTab === "security"
                 ? "Manage your admin portal access password."
+                : activeTab === "workers"
+                ? "Manage worker accounts, assign unique referral codes, and review individual performance across all worker posts."
                 : activeTab === "chat"
                 ? "Chat directly in real-time with prospective tenants visiting your rental listings."
                 : activeTab === "submissions"
@@ -811,7 +928,7 @@ function AdminPage() {
         {/* Main Content Workspace */}
         <main className="p-6 max-w-6xl w-full">
           {/* Quick Metrics Bar */}
-          {activeTab !== "security" && activeTab !== "settings" && (
+          {activeTab !== "security" && activeTab !== "settings" && activeTab !== "workers" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div
                 onClick={() => {
@@ -1134,14 +1251,31 @@ function AdminPage() {
           {/* ------------------------------------------------------- */}
           {activeTab === "properties" && !isCreating && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-serif text-xl font-bold">Your Rental Properties ({properties.length})</h2>
-                <span className="text-xs text-muted-foreground">Each property below has its own distinct link</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-serif text-xl font-bold">Your Rental Properties ({filteredProperties.length})</h2>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Posted by:</label>
+                  <select
+                    value={workerFilter}
+                    onChange={(e) => setWorkerFilter(e.target.value)}
+                    className="rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs font-medium cursor-pointer"
+                  >
+                    <option value="all">All (Admin + Workers)</option>
+                    <option value="admin">Admin only</option>
+                    {workers.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.referralCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                {properties.map((prop) => {
-                  const link = getFullShareLink(prop.id);
+                {filteredProperties.map((prop) => {
+                  const link = prop.referralCode
+                    ? `${getFullShareLink(prop.id)}&ref=${prop.referralCode}`
+                    : getFullShareLink(prop.id);
                   const isCopied = copiedId === prop.id;
 
                   return (
@@ -1162,6 +1296,16 @@ function AdminPage() {
                           )}
                           <div>
                             <span className="eyebrow text-[0.58rem] text-primary">ID: {prop.id}</span>
+                            <span
+                              className={`ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.6rem] font-bold ${
+                                prop.ownerId
+                                  ? "border-sky-500/30 bg-sky-500/10 text-sky-700"
+                                  : "border-border bg-secondary text-muted-foreground"
+                              }`}
+                            >
+                              <User className="h-2.5 w-2.5" />
+                              {prop.ownerId ? `${prop.ownerName || "Worker"} · ${prop.referralCode || ""}` : "Admin"}
+                            </span>
                             <h3 className="font-serif text-xl font-bold text-foreground">{prop.address}</h3>
                             <p className="text-xs text-muted-foreground">{prop.city}, {prop.state} {prop.zip}</p>
                             <p className="mt-1 font-semibold text-primary">
@@ -1182,7 +1326,7 @@ function AdminPage() {
 
                           <button
                             type="button"
-                            onClick={() => copyToClipboard(prop.id)}
+                            onClick={() => copyToClipboard(prop.id, link)}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition shrink-0 cursor-pointer ${
                               isCopied
                                 ? "bg-emerald-600 text-white"
@@ -1236,6 +1380,27 @@ function AdminPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Filter Submissions by Worker */}
+                  <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs shadow-2xs">
+                    <label className="font-bold text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                      <User className="h-3.5 w-3.5 text-primary" />
+                      <span>Worker:</span>
+                    </label>
+                    <select
+                      value={workerFilter}
+                      onChange={(e) => setWorkerFilter(e.target.value)}
+                      className="bg-transparent font-medium text-foreground text-xs focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">All (Admin + Workers)</option>
+                      <option value="admin">Admin only</option>
+                      {workers.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({w.referralCode})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Search Submissions by Date */}
                   <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs shadow-2xs">
                     <label htmlFor="admin-date-filter" className="flex items-center gap-1.5 font-bold text-muted-foreground whitespace-nowrap">
@@ -1398,6 +1563,24 @@ function AdminPage() {
                                   <span>100% Completed Application</span>
                                 </span>
                               )}
+
+                              {/* Worker Attribution Badge */}
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.65rem] font-bold ${
+                                  sub.ownerId || sub.referralCode
+                                    ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                                    : "border-border bg-secondary text-muted-foreground"
+                                }`}
+                              >
+                                <User className="h-3 w-3" />
+                                <span>
+                                  {sub.ownerName || sub.ownerId
+                                    ? `Worker: ${sub.ownerName || "Assigned"} · ${sub.referralCode || ""}`
+                                    : sub.referralCode
+                                    ? `Ref: ${sub.referralCode}`
+                                    : "Admin Direct"}
+                                </span>
+                              </span>
                             </div>
 
                             <h3 className="font-serif text-xl font-bold text-foreground flex items-center gap-2">
@@ -1826,6 +2009,317 @@ function AdminPage() {
                     <p className="text-xs text-muted-foreground mt-1 max-w-sm font-medium">
                       Choose an applicant from the left to start real-time two-way messaging.
                     </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ------------------------------------------------------- */}
+          {/* VIEW: WORKERS & REFERRALS MANAGEMENT */}
+          {/* ------------------------------------------------------- */}
+          {activeTab === "workers" && (
+            <div className="space-y-6">
+              {/* Top Info Banner with Portal Link */}
+              <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300">
+                    <Share2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-foreground">Worker Login &amp; Referral System</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xl leading-relaxed">
+                      Every worker has their own dedicated panel at <strong className="text-foreground">/worker</strong>. Workers can post properties and track only their own tenant leads. All leads and posts are automatically tracked and aggregated here in your Admin Panel.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/worker"
+                    target="_blank"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition shrink-0"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Open /worker Portal</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Add New Worker Form */}
+              <div className="rounded-xl border border-border bg-card p-6 shadow-xs">
+                <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
+                  <Users className="h-5 w-5 text-primary" />
+                  <h3 className="font-serif text-xl font-bold">Create New Worker Account</h3>
+                </div>
+
+                <form onSubmit={handleCreateWorker} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-foreground">Worker Full Name *</label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="e.g. John Smith"
+                        value={newWorkerName}
+                        onChange={(e) => setNewWorkerName(e.target.value)}
+                        className="spa-field text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-foreground">Username (for Login) *</label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="e.g. john"
+                        value={newWorkerUsername}
+                        onChange={(e) => setNewWorkerUsername(e.target.value)}
+                        className="spa-field text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-foreground">Password (Min 4 chars) *</label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="e.g. worker123"
+                        value={newWorkerPassword}
+                        onChange={(e) => setNewWorkerPassword(e.target.value)}
+                        className="spa-field text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 text-foreground">Worker Phone (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="+1 (555) 000-0000"
+                        value={newWorkerPhone}
+                        onChange={(e) => setNewWorkerPhone(e.target.value)}
+                        className="spa-field text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {workerMsg && (
+                    <div
+                      className={`rounded-lg border p-3 text-xs font-semibold flex items-center gap-2 ${
+                        workerMsg.type === "ok"
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                          : "border-destructive/30 bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      {workerMsg.type === "ok" ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+                      )}
+                      <span>{workerMsg.text}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs"
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      <span>Add Worker Account</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Workers Performance & List */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-xl font-bold">Registered Workers ({workers.length})</h3>
+                  <span className="text-xs text-muted-foreground">Each worker has an auto-generated referral code</span>
+                </div>
+
+                {workers.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+                    <Users className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+                    <p className="font-semibold text-foreground">No workers added yet.</p>
+                    <p className="text-xs mt-1">Use the form above to create worker accounts for your team.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {workers.map((w) => {
+                      const workerProps = properties.filter((p) => p.ownerId === w.id);
+                      const workerSubs = submissions.filter(
+                        (s) => s.ownerId === w.id || (s.referralCode && s.referralCode === w.referralCode)
+                      );
+                      const completedCount = workerSubs.filter((s) => s.status === "completed").length;
+                      const pendingCount = workerSubs.filter((s) => s.status === "pending_credit").length;
+                      const incompleteCount = workerSubs.filter((s) => s.status === "incomplete").length;
+                      const isRevealed = Boolean(revealedPasswords[w.id]);
+
+                      return (
+                        <div
+                          key={w.id}
+                          className="rounded-xl border border-border bg-card p-5 shadow-xs hover:border-primary/40 transition"
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            {/* Worker Identity */}
+                            <div className="flex items-start gap-3.5">
+                              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border font-serif font-bold text-lg text-primary bg-secondary/70">
+                                {w.name.charAt(0).toUpperCase()}
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-serif text-lg font-bold text-foreground">{w.name}</h4>
+                                  <span
+                                    className={`inline-block rounded-full border px-2 py-0.5 text-[0.6rem] font-bold ${
+                                      w.active
+                                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                        : "border-border bg-secondary text-muted-foreground"
+                                    }`}
+                                  >
+                                    {w.active ? "Active" : "Disabled"}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                                  <span>
+                                    Username: <strong className="text-foreground font-mono">{w.username}</strong>
+                                  </span>
+                                  <span>·</span>
+                                  <span>
+                                    Referral Code:{" "}
+                                    <strong className="text-foreground font-mono bg-secondary px-1.5 py-0.5 rounded border border-border">
+                                      {w.referralCode}
+                                    </strong>
+                                  </span>
+                                  {w.phone && (
+                                    <>
+                                      <span>·</span>
+                                      <span>Phone: {w.phone}</span>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* Password Reveal & Reset */}
+                                <div className="flex items-center gap-2 mt-2 text-xs">
+                                  <span className="text-muted-foreground">Password:</span>
+                                  <span className="font-mono text-foreground font-semibold bg-secondary/80 px-2 py-0.5 rounded border border-border">
+                                    {isRevealed ? w.password : "••••••••"}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setRevealedPasswords((prev) => ({
+                                        ...prev,
+                                        [w.id]: !prev[w.id],
+                                      }))
+                                    }
+                                    className="text-[0.7rem] text-primary hover:underline cursor-pointer"
+                                  >
+                                    {isRevealed ? "Hide" : "Show"}
+                                  </button>
+                                  <span>·</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResetWorkerPassword(w)}
+                                    className="text-[0.7rem] text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                                  >
+                                    Reset Password
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Performance Metrics */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-secondary/40 p-3 rounded-lg border border-border text-center">
+                              <div className="px-2">
+                                <span className="text-[0.62rem] text-muted-foreground uppercase tracking-wider block font-bold">
+                                  Properties
+                                </span>
+                                <span className="font-serif text-base font-bold text-foreground">
+                                  {workerProps.length}
+                                </span>
+                              </div>
+                              <div className="px-2">
+                                <span className="text-[0.62rem] text-orange-600 uppercase tracking-wider block font-bold">
+                                  Incomplete
+                                </span>
+                                <span className="font-serif text-base font-bold text-orange-600">
+                                  {incompleteCount}
+                                </span>
+                              </div>
+                              <div className="px-2">
+                                <span className="text-[0.62rem] text-amber-600 uppercase tracking-wider block font-bold">
+                                  Pending
+                                </span>
+                                <span className="font-serif text-base font-bold text-amber-600">
+                                  {pendingCount}
+                                </span>
+                              </div>
+                              <div className="px-2">
+                                <span className="text-[0.62rem] text-emerald-600 uppercase tracking-wider block font-bold">
+                                  Completed
+                                </span>
+                                <span className="font-serif text-base font-bold text-emerald-600">
+                                  {completedCount}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWorkerFilter(w.id);
+                                  setActiveTab("properties");
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
+                                title="View this worker's properties"
+                              >
+                                <Building2 className="h-3.5 w-3.5 text-primary" />
+                                <span>Properties ({workerProps.length})</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWorkerFilter(w.id);
+                                  setActiveTab("submissions");
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer"
+                                title="View this worker's leads"
+                              >
+                                <Users className="h-3.5 w-3.5 text-primary" />
+                                <span>Leads ({workerSubs.length})</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleToggleWorker(w)}
+                                className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold cursor-pointer ${
+                                  w.active
+                                    ? "border-amber-500/30 text-amber-700 hover:bg-amber-500/10"
+                                    : "border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10"
+                                }`}
+                              >
+                                {w.active ? "Deactivate" : "Activate"}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWorker(w)}
+                                className="rounded-lg border border-border p-1.5 text-destructive hover:bg-destructive/10 cursor-pointer"
+                                title="Delete worker"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
