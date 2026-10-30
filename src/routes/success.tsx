@@ -28,7 +28,6 @@ export const Route = createFileRoute("/success")({
 });
 
 const steps = [
-  "Open the credit check below and sign up or sign in.",
   "Once your score appears, take a screenshot of that page.",
   "Upload the screenshot here so the landlord can verify your score.",
   "Complete your credit check follow this URL now and attached the screenshot below of your current credit score and submit your application through Email.",
