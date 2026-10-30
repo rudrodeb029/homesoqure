@@ -147,6 +147,26 @@ function AdminPage() {
   const [newWorkerPhone, setNewWorkerPhone] = useState("");
   const [workerMsg, setWorkerMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
+  const [copiedWorkerCredsId, setCopiedWorkerCredsId] = useState<string | null>(null);
+
+  const handleAutoGenerateCredentials = () => {
+    const base = newWorkerName
+      ? newWorkerName.toLowerCase().replace(/[^a-z0-9]/g, "")
+      : "worker";
+    const randNum = Math.floor(100 + Math.random() * 900);
+    const generatedUsername = `${base.slice(0, 8)}${randNum}`;
+    const generatedPassword = `pass${Math.floor(1000 + Math.random() * 9000)}`;
+    setNewWorkerUsername(generatedUsername);
+    setNewWorkerPassword(generatedPassword);
+  };
+
+  const handleCopyWorkerCredentials = (w: Worker) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://homesoqure.web.app";
+    const text = `Worker Portal Login:\nURL: ${origin}/worker\nUsername: ${w.username}\nPassword: ${w.password}\nReferral Code: ${w.referralCode}`;
+    navigator.clipboard.writeText(text);
+    setCopiedWorkerCredsId(w.id);
+    setTimeout(() => setCopiedWorkerCredsId(null), 2500);
+  };
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -2048,9 +2068,19 @@ function AdminPage() {
 
               {/* Add New Worker Form */}
               <div className="rounded-xl border border-border bg-card p-6 shadow-xs">
-                <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
-                  <Users className="h-5 w-5 text-primary" />
-                  <h3 className="font-serif text-xl font-bold">Create New Worker Account</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    <h3 className="font-serif text-xl font-bold">Create New Worker Account</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAutoGenerateCredentials}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition cursor-pointer"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Auto-Generate Unique Username &amp; Password</span>
+                  </button>
                 </div>
 
                 <form onSubmit={handleCreateWorker} className="space-y-4">
@@ -2269,6 +2299,24 @@ function AdminPage() {
 
                             {/* Actions */}
                             <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyWorkerCredentials(w)}
+                                className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                                  copiedWorkerCredsId === w.id
+                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                    : "border-border bg-card text-foreground hover:bg-secondary"
+                                }`}
+                                title="Copy login portal URL, username, and password to send to worker"
+                              >
+                                {copiedWorkerCredsId === w.id ? (
+                                  <Check className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5 text-primary" />
+                                )}
+                                <span>{copiedWorkerCredsId === w.id ? "Copied!" : "Copy Login Info"}</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => {
