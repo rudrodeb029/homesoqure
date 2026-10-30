@@ -145,6 +145,27 @@ export async function saveSiteSettings(updates: Partial<SiteSettings>): Promise<
   if (typeof window !== "undefined") {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent("homqero_settings_updated", { detail: updated }));
+
+    // Propagate updated support email to properties so any direct property reference uses the new email
+    if (updates.supportEmail) {
+      try {
+        const allProps = getProperties();
+        let changed = false;
+        for (const p of allProps) {
+          if (!p.supportEmail || p.supportEmail === current.supportEmail || p.supportEmail === "landlord@homqero.com") {
+            p.supportEmail = updates.supportEmail;
+            savePropertyCloud(p);
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(PROPERTIES_KEY, JSON.stringify(allProps));
+        }
+      } catch (propErr) {
+        console.warn("Property email sync notice:", propErr);
+      }
+    }
+
     try {
       const { doc, setDoc } = await import("firebase/firestore");
       const { db } = await import("./firebase");

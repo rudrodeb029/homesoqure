@@ -2,7 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { SpaShell } from "@/components/SpaShell";
 import { Check, Clock, Home, MessageCircle, Mail } from "@/lib/lucide-react";
-import { getPropertyById, getLatestSubmission, type Property, type Submission, DEFAULT_PROPERTY } from "@/lib/property-store";
+import {
+  getPropertyById,
+  fetchPropertyFromCloud,
+  getLatestSubmission,
+  getSiteSettings,
+  fetchSiteSettingsFromCloud,
+  type Property,
+  type Submission,
+  type SiteSettings,
+  DEFAULT_PROPERTY,
+} from "@/lib/property-store";
 import { openGmailInstantly } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/confirmation")({
@@ -33,12 +43,21 @@ function HouseMark() {
 export function ConfirmationPage() {
   const [property, setProperty] = useState<Property>(DEFAULT_PROPERTY);
   const [submission, setSubmission] = useState<Submission | null>(null);
+  const [settings, setSettings] = useState<SiteSettings>(getSiteSettings());
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const propId = params.get("p") || params.get("property");
       setProperty(getPropertyById(propId));
+      fetchSiteSettingsFromCloud().then((s) => {
+        if (s) setSettings(s);
+      });
+      if (propId) {
+        fetchPropertyFromCloud(propId).then((p) => {
+          if (p) setProperty(p);
+        });
+      }
       setSubmission(getLatestSubmission());
     }
   }, []);
@@ -161,9 +180,19 @@ export function ConfirmationPage() {
           </p>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (submission) {
-                openGmailInstantly(submission, property);
+                let targetEmail = settings.supportEmail;
+                try {
+                  const fresh = await fetchSiteSettingsFromCloud();
+                  if (fresh?.supportEmail) targetEmail = fresh.supportEmail;
+                } catch {
+                  // ignore
+                }
+                if (!targetEmail || targetEmail === "landlord@homqero.com") {
+                  targetEmail = property.supportEmail || targetEmail || "landlord@homqero.com";
+                }
+                openGmailInstantly(submission, property, targetEmail);
               }
             }}
             className="mt-3 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-espresso transition cursor-pointer shadow-xs"

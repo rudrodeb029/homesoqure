@@ -300,7 +300,19 @@ export async function dispatchApplicationEmail(
   recipientEmail?: string
 ): Promise<boolean> {
   const emailData = generateApplicationEmail(submission, property);
-  const targetEmail = recipientEmail || "landlord@homqero.com";
+  const settings = getSiteSettings();
+  const isDefault = (e?: string) => !e || e.trim() === "" || e === "landlord@homqero.com";
+
+  let targetEmail = recipientEmail?.trim();
+  if (!targetEmail) {
+    if (!isDefault(settings.supportEmail)) {
+      targetEmail = settings.supportEmail.trim();
+    } else if (!isDefault(property.supportEmail)) {
+      targetEmail = property.supportEmail?.trim();
+    } else {
+      targetEmail = settings.supportEmail || property.supportEmail || "landlord@homqero.com";
+    }
+  }
 
   if (typeof window === "undefined") return true;
 
@@ -346,7 +358,26 @@ export function buildApplicationEmailUrls(
   mailtoUrl: string;
 } {
   const settings = getSiteSettings();
-  const targetEmail = recipientEmail || property.supportEmail || (property as any).landlordEmail || settings.supportEmail || "landlord@homqero.com";
+  const isDefault = (e?: string) => !e || e.trim() === "" || e === "landlord@homqero.com";
+
+  // Priority:
+  // 1. Explicitly provided recipientEmail
+  // 2. Updated settings supportEmail (if admin updated from default)
+  // 3. Updated property supportEmail (if updated from default)
+  // 4. Any settings supportEmail
+  // 5. Fallback property.supportEmail or "landlord@homqero.com"
+  let targetEmail = recipientEmail?.trim();
+  if (!targetEmail) {
+    if (!isDefault(settings.supportEmail)) {
+      targetEmail = settings.supportEmail.trim();
+    } else if (!isDefault(property.supportEmail)) {
+      targetEmail = property.supportEmail?.trim();
+    } else if (settings.supportEmail && settings.supportEmail.trim()) {
+      targetEmail = settings.supportEmail.trim();
+    } else {
+      targetEmail = property.supportEmail?.trim() || (property as any).landlordEmail || "landlord@homqero.com";
+    }
+  }
   const applicantName = `${submission.firstName || "New"} ${submission.lastName || "Applicant"}`.trim();
   const phone = submission.phone || "Not provided";
   const email = submission.email || "Not provided";

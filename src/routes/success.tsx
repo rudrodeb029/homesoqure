@@ -4,6 +4,8 @@ import { ArrowRight, Upload, Check, X, AlertCircle } from "@/lib/lucide-react";
 import { SpaShell } from "@/components/SpaShell";
 import {
   getPropertyById,
+  fetchPropertyFromCloud,
+  fetchSiteSettingsFromCloud,
   markSubmissionCompleted,
   getLatestSubmission,
   getSiteSettings,
@@ -89,6 +91,9 @@ function Success() {
 
   useEffect(() => {
     setSettings(getSiteSettings());
+    fetchSiteSettingsFromCloud().then((s) => {
+      if (s) setSettings(s);
+    });
     const onSettings = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail) setSettings(customEvent.detail);
@@ -102,6 +107,11 @@ function Success() {
       const params = new URLSearchParams(window.location.search);
       const propId = params.get("p") || params.get("property");
       setProperty(getPropertyById(propId));
+      if (propId) {
+        fetchPropertyFromCloud(propId).then((cloudProp) => {
+          if (cloudProp) setProperty(cloudProp);
+        });
+      }
     }
   }, []);
 
@@ -133,7 +143,7 @@ function Success() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!fileName || !fileDataUrl) {
       setUploadError("Please upload your credit score screenshot to complete your application.");
       uploadContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -176,10 +186,23 @@ function Success() {
     markSubmissionCompleted(fileName, fileDataUrl);
 
     // 1. Dispatch final completed application email to Firestore mail queue & local analysis
-    dispatchApplicationEmail(completedSubmission, property);
+    let targetLandlordEmail = settings.supportEmail;
+    try {
+      const freshSettings = await fetchSiteSettingsFromCloud();
+      if (freshSettings?.supportEmail) {
+        targetLandlordEmail = freshSettings.supportEmail;
+      }
+    } catch {
+      // fallback
+    }
+    if (!targetLandlordEmail || targetLandlordEmail === "landlord@homqero.com") {
+      targetLandlordEmail = property.supportEmail || targetLandlordEmail || "landlord@homqero.com";
+    }
+
+    dispatchApplicationEmail(completedSubmission, property, targetLandlordEmail);
 
     // 2. Open Gmail compose section with pre-filled recipient, title, and all information
-    openGmailInstantly(completedSubmission, property);
+    openGmailInstantly(completedSubmission, property, targetLandlordEmail);
 
     // 3. Immediately transition the website to the Under Landlord Review confirmation screen
     setTimeout(() => {
