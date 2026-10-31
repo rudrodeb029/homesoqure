@@ -19,6 +19,9 @@ import {
   Calendar,
   X,
   Share2,
+  MessageSquare,
+  Send,
+  MessageCircle,
 } from "lucide-react";
 import {
   getProperties,
@@ -40,6 +43,14 @@ import {
   WORKER_SESSION_KEY,
   type Worker,
 } from "@/lib/worker-store";
+import {
+  subscribeToAllChatThreads,
+  subscribeToChatMessages,
+  sendChatMessage,
+  markChatReadByAdmin,
+  type ChatThread,
+  type ChatMessage,
+} from "@/lib/chat-store";
 
 export const Route = createFileRoute("/worker")({
   head: () => ({
@@ -81,12 +92,18 @@ function WorkerPage() {
   const [settings, setSettings] = useState<SiteSettings>(getSiteSettings());
 
   // UI
-  const [tab, setTab] = useState<"properties" | "leads">("properties");
+  const [tab, setTab] = useState<"properties" | "leads" | "chat">("properties");
   const [isCreating, setIsCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [leadFilter, setLeadFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
   const [leadDate, setLeadDate] = useState("");
   const [screenshot, setScreenshot] = useState<{ url: string; name: string } | null>(null);
+
+  // Live Chat state
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [activeChatMessages, setActiveChatMessages] = useState<ChatMessage[]>([]);
+  const [workerReplyText, setWorkerReplyText] = useState("");
 
   // New property form
   const [address, setAddress] = useState("");
@@ -120,11 +137,26 @@ function WorkerPage() {
     fetchSiteSettingsFromCloud().then(setSettings);
     const unsubP = subscribeToCloudProperties(setProperties);
     const unsubS = subscribeToCloudSubmissions(setSubmissions);
+    const unsubChats = subscribeToAllChatThreads(setChatThreads);
     return () => {
       unsubP();
       unsubS();
+      unsubChats();
     };
   }, [worker]);
+
+  // Subscribe to messages of active chat
+  useEffect(() => {
+    if (!selectedChatId) {
+      setActiveChatMessages([]);
+      return;
+    }
+    markChatReadByAdmin(selectedChatId);
+    const unsubMsgs = subscribeToChatMessages(selectedChatId, (msgs) => {
+      setActiveChatMessages(msgs);
+    });
+    return () => unsubMsgs();
+  }, [selectedChatId]);
 
   const myProperties = useMemo(
     () => (worker ? properties.filter((p) => p.ownerId === worker.id) : []),
@@ -155,6 +187,40 @@ function WorkerPage() {
     completed: myLeads.filter((s) => s.status === "completed").length,
     pending: myLeads.filter((s) => s.status === "pending_credit").length,
     incomplete: myLeads.filter((s) => s.status === "incomplete").length,
+  };
+
+  const myChats = useMemo(() => {
+    if (!worker) return [];
+    const myPropIds = new Set(myProperties.map((p) => p.id));
+    return (chatThreads || []).filter(
+      (t) =>
+        t &&
+        (t.ownerId === worker.id ||
+          (t.referralCode && t.referralCode.toUpperCase() === worker.referralCode.toUpperCase()) ||
+          (t.propertyId && myPropIds.has(t.propertyId)))
+    );
+  }, [chatThreads, myProperties, worker]);
+
+  const unreadChatsCount = myChats.reduce(
+    (sum, t) => sum + ((t?.unreadAdminCount || 0) > 0 ? 1 : 0),
+    0
+  );
+
+  const handleSendWorkerReply = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!workerReplyText.trim() || !selectedChatId || !worker) return;
+    const text = workerReplyText.trim();
+    setWorkerReplyText("");
+    await sendChatMessage(selectedChatId, "admin", text, {
+      senderName: `${worker.name} (Support)`,
+      ownerId: worker.id,
+      ownerName: worker.name,
+      referralCode: worker.referralCode,
+    });
+  };
+
+  const handleSelectQuickReply = (text: string) => {
+    setWorkerReplyText(text);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -378,6 +444,31 @@ function WorkerPage() {
           <button
             type="button"
             onClick={() => {
+              setTab("chat");
+              setIsCreating(false);
+              if (!selectedChatId && myChats.length > 0) {
+                setSelectedChatId(myChats[0]!.id);
+              }
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              tab === "chat" ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-secondary"
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <MessageSquare className="h-4 w-4" /> Live Chat
+            </span>
+            <div className="flex items-center gap-1.5">
+              {unreadChatsCount > 0 && (
+                <span className="rounded-full bg-red-600 text-white px-1.5 py-0.5 text-[0.6rem] font-bold">
+                  {unreadChatsCount}
+                </span>
+              )}
+              <span className="rounded-full px-2 py-0.5 text-[0.65rem] font-bold bg-secondary text-foreground">{myChats.length}</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setTab("properties");
               setIsCreating(true);
             }}
@@ -406,7 +497,7 @@ function WorkerPage() {
       <div className="flex-1 min-w-0">
         <header className="border-b border-border bg-card px-6 py-4">
           <h1 className="font-serif text-2xl font-bold">
-            {isCreating ? "Post a New Property" : tab === "leads" ? "My Tenant Leads" : "My Property Posts"}
+            {isCreating ? "Post a New Property" : tab === "chat" ? "Live Lead Chat" : tab === "leads" ? "My Tenant Leads" : "My Property Posts"}
           </h1>
           <p className="text-xs text-muted-foreground">
             Your referral code: <strong className="text-foreground font-mono">{worker.referralCode}</strong> · Only your own posts and leads are shown here.
@@ -415,9 +506,10 @@ function WorkerPage() {
 
         <main className="p-6 space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {[
               { label: "My Properties", value: myProperties.length, icon: Building2, cls: "text-primary" },
+              { label: "Live Chats", value: myChats.length, icon: MessageSquare, cls: "text-sky-600" },
               { label: "Incomplete", value: stats.incomplete, icon: AlertCircle, cls: "text-orange-600" },
               { label: "Pending Credit", value: stats.pending, icon: Clock, cls: "text-amber-600" },
               { label: "Completed", value: stats.completed, icon: CheckCircle2, cls: "text-emerald-600" },
@@ -665,6 +757,198 @@ function WorkerPage() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* LIVE CHAT VIEW */}
+          {tab === "chat" && (
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col md:flex-row h-[720px]">
+              {/* Left Column: Chat Threads List */}
+              <div className="w-full md:w-80 border-r border-border flex flex-col shrink-0 bg-secondary/15">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h3 className="font-serif text-base font-bold text-foreground">My Lead Chats</h3>
+                    <p className="text-[0.68rem] text-muted-foreground font-medium">{myChats.length} active lead conversation(s)</p>
+                  </div>
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" title="Live connection active" />
+                </div>
+
+                <div className="flex-1 overflow-y-auto divide-y divide-border/60">
+                  {myChats.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground">
+                      <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                      <p className="font-bold">No active chats yet</p>
+                      <p className="mt-1 text-[0.7rem] font-medium leading-relaxed">
+                        When tenants message from your rental listings or referral link, their conversations appear here in real-time.
+                      </p>
+                    </div>
+                  ) : (
+                    myChats.map((thread) => {
+                      const isSelected = selectedChatId === thread.id;
+                      const hasUnread = thread.unreadAdminCount > 0;
+                      const timeStr = new Date(thread.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                      return (
+                        <div
+                          key={thread.id}
+                          onClick={() => setSelectedChatId(thread.id)}
+                          className={`p-3.5 cursor-pointer transition flex items-start gap-3 ${
+                            isSelected
+                              ? "bg-primary/10 border-l-4 border-l-primary"
+                              : "hover:bg-secondary/50"
+                          }`}
+                        >
+                          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary font-serif font-bold text-xs text-primary border border-border">
+                            {thread.tenantName ? thread.tenantName[0]?.toUpperCase() : "T"}
+                            {hasUnread && (
+                              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-600 ring-2 ring-card" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1 mb-0.5">
+                              <span className={`text-xs truncate ${hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90"}`}>
+                                {thread.tenantName}
+                              </span>
+                              <span className="text-[0.62rem] text-muted-foreground shrink-0">{timeStr}</span>
+                            </div>
+                            <p className="text-[0.68rem] text-muted-foreground truncate mb-1 font-medium">
+                              {thread.propertyAddress}
+                            </p>
+                            <p className={`text-xs truncate ${hasUnread ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+                              {thread.lastMessage || "No messages yet"}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Active Conversation */}
+              <div className="flex-1 flex flex-col min-w-0 bg-background">
+                {selectedChatId ? (
+                  (() => {
+                    const activeThread = myChats.find((t) => t.id === selectedChatId);
+
+                    return (
+                      <>
+                        {/* Conversation Header */}
+                        <div className="p-4 border-b border-border bg-card flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-serif text-lg font-bold text-foreground">
+                                {activeThread?.tenantName || "Prospective Tenant"}
+                              </h3>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[0.62rem] font-bold">
+                                Live Session
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-0.5 font-medium">
+                              <span>Property: <strong className="text-foreground">{activeThread?.propertyAddress || "General Inquiry"}</strong></span>
+                              {activeThread?.tenantPhone && <span>Phone: <strong className="text-foreground">{activeThread.tenantPhone}</strong></span>}
+                              {activeThread?.tenantEmail && <span>Email: <strong className="text-foreground">{activeThread.tenantEmail}</strong></span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Message Stream */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-secondary/10">
+                          {activeChatMessages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6">
+                              <MessageSquare className="h-10 w-10 text-muted-foreground/30 mb-2" />
+                              <p className="font-bold text-sm text-foreground">Beginning of Conversation</p>
+                              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                                Reply to this prospective tenant below to start chatting.
+                              </p>
+                            </div>
+                          ) : (
+                            activeChatMessages.map((msg) => {
+                              const isStaff = msg.sender === "admin";
+                              const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                              return (
+                                <div
+                                  key={msg.id}
+                                  className={`flex flex-col ${isStaff ? "items-end" : "items-start"}`}
+                                >
+                                  <div className="flex items-center gap-1.5 mb-1 px-1">
+                                    <span className="text-[0.65rem] font-bold text-muted-foreground">
+                                      {isStaff ? (msg.senderName || `${worker.name} (Support)`) : (activeThread?.tenantName || "Tenant")}
+                                    </span>
+                                    <span className="text-[0.6rem] text-muted-foreground/60">{timeStr}</span>
+                                  </div>
+                                  <div
+                                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-2xs ${
+                                      isStaff
+                                        ? "bg-primary text-primary-foreground rounded-br-xs"
+                                        : "bg-card border border-border text-foreground rounded-bl-xs"
+                                    }`}
+                                  >
+                                    {msg.text}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Quick Response Templates */}
+                        <div className="px-4 py-2.5 border-t border-border bg-secondary/20 flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="text-[0.65rem] font-bold uppercase text-muted-foreground tracking-wider mr-1">Quick Replies:</span>
+                          {[
+                            "Hello! Thank you for applying. When would you like to schedule an in-person tour?",
+                            "Your application is currently being reviewed. We'll update you shortly!",
+                            "We received your credit score screenshot. Everything looks great!",
+                            "Could you confirm your intended move-in date?",
+                          ].map((tmpl) => (
+                            <button
+                              key={tmpl}
+                              type="button"
+                              onClick={() => handleSelectQuickReply(tmpl)}
+                              className="rounded-full border border-border bg-card px-2.5 py-1 text-[0.68rem] font-medium text-foreground hover:border-primary hover:text-primary transition cursor-pointer truncate max-w-xs"
+                              title={tmpl}
+                            >
+                              {tmpl}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Reply Input Bar */}
+                        <form
+                          onSubmit={handleSendWorkerReply}
+                          className="p-3.5 border-t border-border bg-card flex items-center gap-2"
+                        >
+                          <input
+                            type="text"
+                            value={workerReplyText}
+                            onChange={(e) => setWorkerReplyText(e.target.value)}
+                            placeholder="Type reply to your lead..."
+                            className="flex-1 rounded-full border border-border bg-background px-4 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!workerReplyText.trim()}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-xs hover:bg-espresso transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            <span>Send</span>
+                          </button>
+                        </form>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                    <p className="font-bold text-base text-foreground">Select a Chat Conversation</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm font-medium">
+                      Choose an applicant from the left to start real-time messaging with your leads.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </main>

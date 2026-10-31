@@ -349,7 +349,15 @@ function AdminPage() {
     if (!adminReplyText.trim() || !selectedChatId) return;
     const text = adminReplyText.trim();
     setAdminReplyText("");
-    await sendChatMessage(selectedChatId, "admin", text);
+    const activeThread = safeChatThreads.find((t) => t.id === selectedChatId);
+    await sendChatMessage(selectedChatId, "admin", text, {
+      senderName: "Landlord Support (Admin)",
+      ownerId: activeThread?.ownerId,
+      ownerName: activeThread?.ownerName,
+      referralCode: activeThread?.referralCode,
+      propertyId: activeThread?.propertyId,
+      propertyAddress: activeThread?.propertyAddress,
+    });
   };
 
   const handleSelectQuickReply = (text: string) => {
@@ -566,6 +574,12 @@ function AdminPage() {
   };
 
   const filteredProperties = safeProperties.filter((p) => p && matchesWorkerFilter(p.ownerId));
+
+  const filteredChatThreads = safeChatThreads.filter((t) => {
+    if (!t) return false;
+    if (!matchesWorkerFilter(t.ownerId)) return false;
+    return true;
+  });
 
   const filteredSubmissions = safeSubmissions.filter((s) => {
     if (!s) return false;
@@ -1858,13 +1872,16 @@ function AdminPage() {
                 <div className="p-4 border-b border-border flex items-center justify-between">
                   <div>
                     <h3 className="font-serif text-base font-bold text-foreground">Conversations</h3>
-                    <p className="text-[0.68rem] text-muted-foreground font-medium">{chatThreads.length} active visitor chat(s)</p>
+                    <p className="text-[0.68rem] text-muted-foreground font-medium">
+                      {filteredChatThreads.length} active visitor chat(s)
+                      {workerFilter !== "all" && " (filtered)"}
+                    </p>
                   </div>
                   <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" title="Live Firestore connection active" />
                 </div>
 
                 <div className="flex-1 overflow-y-auto divide-y divide-border/60">
-                  {chatThreads.length === 0 ? (
+                  {filteredChatThreads.length === 0 ? (
                     <div className="p-8 text-center text-xs text-muted-foreground">
                       <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
                       <p className="font-bold">No active chats yet</p>
@@ -1873,7 +1890,7 @@ function AdminPage() {
                       </p>
                     </div>
                   ) : (
-                    chatThreads.map((thread) => {
+                    filteredChatThreads.map((thread) => {
                       const isSelected = selectedChatId === thread.id;
                       const hasUnread = thread.unreadAdminCount > 0;
                       const timeStr = new Date(thread.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -1902,6 +1919,18 @@ function AdminPage() {
                               </span>
                               <span className="text-[0.62rem] text-muted-foreground shrink-0">{timeStr}</span>
                             </div>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span
+                                className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.2 text-[0.55rem] font-bold ${
+                                  thread.ownerId
+                                    ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                                    : "border-border bg-secondary text-muted-foreground"
+                                }`}
+                              >
+                                <User className="h-2 w-2" />
+                                {thread.ownerName ? `${thread.ownerName} (${thread.referralCode || "Worker"})` : "Admin"}
+                              </span>
+                            </div>
                             <p className="text-[0.68rem] text-muted-foreground truncate mb-1 font-medium">
                               {thread.propertyAddress}
                             </p>
@@ -1920,7 +1949,7 @@ function AdminPage() {
               <div className="flex-1 flex flex-col min-w-0 bg-background">
                 {selectedChatId ? (
                   (() => {
-                    const activeThread = chatThreads.find((t) => t.id === selectedChatId);
+                    const activeThread = safeChatThreads.find((t) => t.id === selectedChatId);
 
                     return (
                       <>
@@ -1934,6 +1963,12 @@ function AdminPage() {
                               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[0.62rem] font-bold">
                                 Live Session
                               </span>
+                              {activeThread?.ownerName && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300 px-2 py-0.5 text-[0.62rem] font-bold">
+                                  <User className="h-2.5 w-2.5" />
+                                  Worker: {activeThread.ownerName} ({activeThread.referralCode})
+                                </span>
+                              )}
                             </div>
                             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-0.5 font-medium">
                               <span>Property: <strong className="text-foreground">{activeThread?.propertyAddress || "General Inquiry"}</strong></span>

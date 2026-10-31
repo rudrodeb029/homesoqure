@@ -9,8 +9,10 @@ import {
 import {
   getLatestSubmission,
   getProperties,
+  getPropertyById,
   getSiteSettings,
 } from "@/lib/property-store";
+import { getWorkers } from "@/lib/worker-store";
 
 export function LiveChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -58,15 +60,67 @@ export function LiveChatWidget() {
     // Look up latest submission or lead details
     const active = getLatestSubmission();
     const props = getProperties();
-    const propAddress = active?.propertyAddress || props[0]?.address || "Homqero Rental Property";
-    const tenantName = active?.firstName ? `${active.firstName} ${active.lastName || ""}`.trim() : "Prospective Tenant";
 
-    await sendChatMessage(chatId, "tenant", text, {
+    let currentPropId: string | null = null;
+    let currentRef: string | null = null;
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentPropId = urlParams.get("p") || urlParams.get("property");
+      currentRef = urlParams.get("ref");
+    }
+
+    const currentProp = currentPropId
+      ? getPropertyById(currentPropId)
+      : active?.propertyId
+      ? getPropertyById(active.propertyId)
+      : null;
+
+    const propAddress =
+      active?.propertyAddress ||
+      currentProp?.address ||
+      props[0]?.address ||
+      "Homqero Rental Property";
+
+    const propertyId = currentProp?.id || active?.propertyId;
+    const tenantName = active?.firstName
+      ? `${active.firstName} ${active.lastName || ""}`.trim()
+      : "Prospective Tenant";
+
+    let ownerId = currentProp?.ownerId || active?.ownerId;
+    let ownerName = currentProp?.ownerName || active?.ownerName;
+    const referralCode =
+      currentProp?.referralCode ||
+      (currentRef ? currentRef.trim().toUpperCase() : undefined) ||
+      active?.referralCode;
+
+    // If referralCode exists but ownerId is not known, match with worker
+    if (!ownerId && referralCode) {
+      try {
+        const allWorkers = getWorkers();
+        const matched = allWorkers.find(
+          (w) => w.referralCode && w.referralCode.toUpperCase() === referralCode.toUpperCase()
+        );
+        if (matched) {
+          ownerId = matched.id;
+          ownerName = matched.name;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const chatMeta = {
       tenantName,
       tenantEmail: active?.email || "",
       tenantPhone: active?.phone || "",
       propertyAddress: propAddress,
-    });
+      propertyId: propertyId || undefined,
+      ownerId: ownerId || undefined,
+      ownerName: ownerName || undefined,
+      referralCode: referralCode || undefined,
+    };
+
+    await sendChatMessage(chatId, "tenant", text, chatMeta);
 
     // Fast auto-reply on first message:
     const autoReplyKey = `homqero_autoreply_sent_${chatId}`;
@@ -85,12 +139,7 @@ export function LiveChatWidget() {
       setIsTyping(true);
       setTimeout(async () => {
         setIsTyping(false);
-        await sendChatMessage(chatId, "admin", autoReplyText, {
-          tenantName,
-          tenantEmail: active?.email || "",
-          tenantPhone: active?.phone || "",
-          propertyAddress: propAddress,
-        });
+        await sendChatMessage(chatId, "admin", autoReplyText, chatMeta);
       }, 800);
     }
   };
@@ -172,7 +221,7 @@ export function LiveChatWidget() {
                 >
                   <div className="flex items-center gap-1 mb-1 px-1">
                     <span className="text-[0.65rem] font-semibold text-muted-foreground">
-                      {isTenant ? "You" : "Landlord Support"}
+                      {isTenant ? "You" : (m.senderName || "Landlord Support")}
                     </span>
                     <span className="text-[0.6rem] text-muted-foreground/60">{timeStr}</span>
                   </div>

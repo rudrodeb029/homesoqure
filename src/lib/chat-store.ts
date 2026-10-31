@@ -15,6 +15,10 @@ export interface ChatThread {
   tenantPhone: string;
   propertyAddress: string;
   propertyId?: string;
+  /** Worker attribution */
+  ownerId?: string;
+  ownerName?: string;
+  referralCode?: string;
   lastMessage: string;
   lastMessageAt: string;
   unreadAdminCount: number;
@@ -67,17 +71,22 @@ function saveLocalMessage(msg: ChatMessage, threadInfo?: Partial<ChatThread>) {
   const threads = getLocalChatThreads();
   const idx = threads.findIndex((t) => t.id === msg.chatId);
   const now = msg.timestamp;
+  const existingThread = idx !== -1 ? threads[idx] : undefined;
 
   const updatedThread: ChatThread = {
     id: msg.chatId,
-    tenantName: threadInfo?.tenantName || (idx !== -1 ? threads[idx]!.tenantName : "Prospective Tenant"),
-    tenantEmail: threadInfo?.tenantEmail || (idx !== -1 ? threads[idx]!.tenantEmail : ""),
-    tenantPhone: threadInfo?.tenantPhone || (idx !== -1 ? threads[idx]!.tenantPhone : ""),
-    propertyAddress: threadInfo?.propertyAddress || (idx !== -1 ? threads[idx]!.propertyAddress : "General Inquiry"),
+    tenantName: threadInfo?.tenantName || existingThread?.tenantName || "Prospective Tenant",
+    tenantEmail: threadInfo?.tenantEmail || existingThread?.tenantEmail || "",
+    tenantPhone: threadInfo?.tenantPhone || existingThread?.tenantPhone || "",
+    propertyAddress: threadInfo?.propertyAddress || existingThread?.propertyAddress || "General Inquiry",
+    propertyId: threadInfo?.propertyId || existingThread?.propertyId,
+    ownerId: threadInfo?.ownerId || existingThread?.ownerId,
+    ownerName: threadInfo?.ownerName || existingThread?.ownerName,
+    referralCode: threadInfo?.referralCode || existingThread?.referralCode,
     lastMessage: msg.text,
     lastMessageAt: now,
-    unreadAdminCount: msg.sender === "tenant" ? ((idx !== -1 ? threads[idx]!.unreadAdminCount : 0) + 1) : 0,
-    unreadTenantCount: msg.sender === "admin" ? ((idx !== -1 ? threads[idx]!.unreadTenantCount : 0) + 1) : 0,
+    unreadAdminCount: msg.sender === "tenant" ? ((existingThread?.unreadAdminCount || 0) + 1) : 0,
+    unreadTenantCount: msg.sender === "admin" ? ((existingThread?.unreadTenantCount || 0) + 1) : 0,
     status: "active",
   };
 
@@ -102,6 +111,11 @@ export async function sendChatMessage(
     tenantEmail?: string;
     tenantPhone?: string;
     propertyAddress?: string;
+    propertyId?: string;
+    ownerId?: string;
+    ownerName?: string;
+    referralCode?: string;
+    senderName?: string;
   }
 ): Promise<ChatMessage> {
   const now = new Date().toISOString();
@@ -110,7 +124,7 @@ export async function sendChatMessage(
     id: msgId,
     chatId,
     sender,
-    senderName: sender === "admin" ? "Landlord Support" : (meta?.tenantName || "Tenant"),
+    senderName: meta?.senderName || (sender === "admin" ? "Landlord Support" : (meta?.tenantName || "Tenant")),
     text: text.trim(),
     timestamp: now,
     read: false,
@@ -130,21 +144,23 @@ export async function sendChatMessage(
 
       // Update parent chat document
       const chatDocRef = doc(db, "chats", chatId);
-      await setDoc(
-        chatDocRef,
-        {
-          id: chatId,
-          tenantName: meta?.tenantName || "Prospective Tenant",
-          tenantEmail: meta?.tenantEmail || "",
-          tenantPhone: meta?.tenantPhone || "",
-          propertyAddress: meta?.propertyAddress || "General Inquiry",
-          lastMessage: msg.text,
-          lastMessageAt: now,
-          status: "active",
-          ...(sender === "tenant" ? { unreadAdmin: true } : { unreadTenant: true }),
-        },
-        { merge: true }
-      );
+      const chatData: Record<string, any> = {
+        id: chatId,
+        tenantName: meta?.tenantName || "Prospective Tenant",
+        tenantEmail: meta?.tenantEmail || "",
+        tenantPhone: meta?.tenantPhone || "",
+        propertyAddress: meta?.propertyAddress || "General Inquiry",
+        lastMessage: msg.text,
+        lastMessageAt: now,
+        status: "active",
+        ...(sender === "tenant" ? { unreadAdmin: true } : { unreadTenant: true }),
+      };
+      if (meta?.propertyId) chatData.propertyId = meta.propertyId;
+      if (meta?.ownerId) chatData.ownerId = meta.ownerId;
+      if (meta?.ownerName) chatData.ownerName = meta.ownerName;
+      if (meta?.referralCode) chatData.referralCode = meta.referralCode;
+
+      await setDoc(chatDocRef, chatData, { merge: true });
     } catch (err) {
       console.warn("Firestore sendChatMessage notice:", err);
     }
@@ -224,6 +240,10 @@ export function subscribeToAllChatThreads(
               tenantEmail: data.tenantEmail || "",
               tenantPhone: data.tenantPhone || "",
               propertyAddress: data.propertyAddress || "General Inquiry",
+              propertyId: data.propertyId || undefined,
+              ownerId: data.ownerId || undefined,
+              ownerName: data.ownerName || undefined,
+              referralCode: data.referralCode || undefined,
               lastMessage: data.lastMessage || "",
               lastMessageAt: data.lastMessageAt || new Date().toISOString(),
               unreadAdminCount: data.unreadAdmin ? 1 : 0,
