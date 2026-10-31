@@ -336,7 +336,7 @@ function WorkerPage() {
       <aside className="w-full md:w-64 lg:w-72 border-r border-border bg-card flex flex-col shrink-0 md:min-h-screen">
         <div className="p-5 border-b border-border flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border font-serif font-bold text-xl text-primary bg-secondary/60">
-            {worker.name.charAt(0).toUpperCase()}
+            {(worker.name || "W").charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0">
             <span className="block font-serif text-lg font-bold leading-tight truncate">{worker.name}</span>

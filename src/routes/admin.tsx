@@ -29,6 +29,8 @@ import {
   Phone,
   PhoneCall,
   Calendar,
+  Share2,
+  User,
 } from "lucide-react";
 import {
   getProperties,
@@ -548,10 +550,14 @@ function AdminPage() {
     setTimeout(() => setCopiedId(null), 2500);
   };
 
-  const completedCount = submissions.filter((s) => s.status === "completed").length;
-  const pendingCount = submissions.filter((s) => s.status === "pending_credit").length;
-  const incompleteCount = submissions.filter((s) => s.status === "incomplete").length;
-  const unreadChatsCount = chatThreads.reduce((sum, t) => sum + (t.unreadAdminCount > 0 ? 1 : 0), 0);
+  const safeSubmissions = Array.isArray(submissions) ? submissions.filter(Boolean) : [];
+  const safeProperties = Array.isArray(properties) ? properties.filter(Boolean) : [];
+  const safeChatThreads = Array.isArray(chatThreads) ? chatThreads.filter(Boolean) : [];
+
+  const completedCount = safeSubmissions.filter((s) => s?.status === "completed").length;
+  const pendingCount = safeSubmissions.filter((s) => s?.status === "pending_credit").length;
+  const incompleteCount = safeSubmissions.filter((s) => s?.status === "incomplete").length;
+  const unreadChatsCount = safeChatThreads.reduce((sum, t) => sum + ((t?.unreadAdminCount || 0) > 0 ? 1 : 0), 0);
 
   const matchesWorkerFilter = (ownerId?: string) => {
     if (workerFilter === "all") return true;
@@ -559,9 +565,10 @@ function AdminPage() {
     return ownerId === workerFilter;
   };
 
-  const filteredProperties = properties.filter((p) => matchesWorkerFilter(p.ownerId));
+  const filteredProperties = safeProperties.filter((p) => p && matchesWorkerFilter(p.ownerId));
 
-  const filteredSubmissions = submissions.filter((s) => {
+  const filteredSubmissions = safeSubmissions.filter((s) => {
+    if (!s) return false;
     if (!matchesWorkerFilter(s.ownerId)) {
       return false;
     }
@@ -569,7 +576,7 @@ function AdminPage() {
       return false;
     }
     if (submissionDateFilter) {
-      const subDate = (s.submittedAt || s.lastUpdated || "").split("T")[0];
+      const subDate = String(s.submittedAt || s.lastUpdated || "").split("T")[0];
       if (subDate !== submissionDateFilter) {
         return false;
       }
@@ -2177,10 +2184,11 @@ function AdminPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
-                    {workers.map((w) => {
-                      const workerProps = properties.filter((p) => p.ownerId === w.id);
-                      const workerSubs = submissions.filter(
-                        (s) => s.ownerId === w.id || (s.referralCode && s.referralCode === w.referralCode)
+                    {(workers || []).map((w) => {
+                      if (!w) return null;
+                      const workerProps = safeProperties.filter((p) => p && p.ownerId === w.id);
+                      const workerSubs = safeSubmissions.filter(
+                        (s) => s && (s.ownerId === w.id || (s.referralCode && s.referralCode === w.referralCode))
                       );
                       const completedCount = workerSubs.filter((s) => s.status === "completed").length;
                       const pendingCount = workerSubs.filter((s) => s.status === "pending_credit").length;
@@ -2196,7 +2204,7 @@ function AdminPage() {
                             {/* Worker Identity */}
                             <div className="flex items-start gap-3.5">
                               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border font-serif font-bold text-lg text-primary bg-secondary/70">
-                                {w.name.charAt(0).toUpperCase()}
+                                {(w.name || "W").charAt(0).toUpperCase()}
                               </span>
                               <div>
                                 <div className="flex items-center gap-2">

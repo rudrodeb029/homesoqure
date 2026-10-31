@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SpaShell } from "@/components/SpaShell";
-import { Lock, ArrowLeft, ShieldCheck, Eye, Database, Check } from "@/lib/lucide-react";
+import { Lock, ArrowLeft, ShieldCheck, Eye, Check } from "@/lib/lucide-react";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
