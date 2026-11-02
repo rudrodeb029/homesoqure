@@ -234,7 +234,24 @@ function Index() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // 1. Employment
+    // 1. Contact Details
+    if (!firstName.trim()) {
+      newErrors.firstName = "Please enter your first name.";
+    }
+    if (!lastName.trim()) {
+      newErrors.lastName = "Please enter your last name.";
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+    if (!phone.trim()) {
+      newErrors.phone = "Please enter your phone number.";
+    } else if (!isValidUSPhone(phone)) {
+      newErrors.phone = "Please enter a valid 10-digit USA phone number, e.g. (555) 000-0000.";
+    }
+
+    // 2. Employment
     if (selectedEmployment.length === 0) {
       newErrors.employment = "Please select at least one employment status.";
     }
@@ -246,7 +263,7 @@ function Index() {
       newErrors.creditRange = "Please select your estimated credit score range.";
     }
 
-    // 2. Move-in Information
+    // 3. Move-in Information
     if (!moveInDate) {
       newErrors.moveInDate = "Please choose your desired move-in date.";
     }
@@ -273,23 +290,6 @@ function Index() {
       if (!viewingTime) {
         newErrors.viewingTime = "Please select a preferred viewing time.";
       }
-    }
-
-    // 3. Contact Details
-    if (!firstName.trim()) {
-      newErrors.firstName = "Please enter your first name.";
-    }
-    if (!lastName.trim()) {
-      newErrors.lastName = "Please enter your last name.";
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim() || !emailRegex.test(email.trim())) {
-      newErrors.email = "Please enter a valid email address.";
-    }
-    if (!phone.trim()) {
-      newErrors.phone = "Please enter your phone number.";
-    } else if (!isValidUSPhone(phone)) {
-      newErrors.phone = "Please enter a valid 10-digit USA phone number, e.g. (555) 000-0000.";
     }
 
     setErrors(newErrors);
@@ -400,7 +400,129 @@ function Index() {
           </div>
         </div>
 
-        {/* SECTION 1: EMPLOYMENT */}
+        {/* SECTION 1: CONTACT DETAILS */}
+        <Section id="section-contact" title="Contact Details">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Q
+              id="q-firstName"
+              label="First name"
+              required
+              error={errors.firstName}
+            >
+              <input
+                id="field-firstName"
+                value={firstName}
+                placeholder="Jane"
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  if (errors.firstName) setErrors((errs) => ({ ...errs, firstName: "" }));
+                }}
+                className={`spa-field font-medium ${
+                  errors.firstName ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
+              />
+            </Q>
+
+            <Q
+              id="q-lastName"
+              label="Last name"
+              required
+              error={errors.lastName}
+            >
+              <input
+                id="field-lastName"
+                value={lastName}
+                placeholder="Doe"
+                onChange={(e) => {
+                  setLastName(e.target.value);
+                  if (errors.lastName) setErrors((errs) => ({ ...errs, lastName: "" }));
+                }}
+                className={`spa-field font-medium ${
+                  errors.lastName ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
+              />
+            </Q>
+
+            <Q
+              id="q-email"
+              label="Email"
+              required
+              error={errors.email}
+            >
+              <input
+                id="field-email"
+                type="email"
+                value={email}
+                placeholder="jane.doe@example.com"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((errs) => ({ ...errs, email: "" }));
+                }}
+                className={`spa-field font-medium ${
+                  errors.email ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                }`}
+              />
+            </Q>
+
+            <Q
+              id="q-phone"
+              label="Phone number"
+              hint="USA 10-digit format only"
+              required
+              error={errors.phone}
+            >
+              <div className="relative">
+                <input
+                  id="field-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  placeholder="(555) 000-0000"
+                  maxLength={14}
+                  className={`spa-field font-medium tracking-wide ${
+                    errors.phone ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground bg-secondary px-1.5 py-0.5 rounded border border-border">
+                  USA
+                </span>
+              </div>
+            </Q>
+          </div>
+
+          <Q id="q-source" label="How did you find this property?">
+            <select
+              id="field-source"
+              name="source"
+              aria-label="How did you find this property?"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              className="spa-field font-medium cursor-pointer"
+            >
+              <option value="">Select source...</option>
+              {[
+                ["ZILLOW", "Zillow"],
+                ["CRAIGSLIST", "Craigslist"],
+                ["APARTMENTS", "Apartments.com"],
+                ["REALTOR", "Realtor.com"],
+                ["FACEBOOK", "Facebook Marketplace"],
+                ["ZUMPER", "Zumper"],
+                ["APARTMENT_LIST", "Apartment List"],
+                ["HOMES_COM", "Homes.com"],
+                ["RENTLER", "Rentler"],
+                ["REFERRAL", "Friend or Family Referral"],
+                ["YARD_SIGN", "Yard Sign / Drove By"],
+                ["OTHER", "Other Source"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Q>
+        </Section>
+
+        {/* SECTION 2: EMPLOYMENT */}
         <Section id="section-employment" title="Employment">
           <Q
             id="q-employment"
@@ -478,7 +600,7 @@ function Index() {
           </Q>
         </Section>
 
-        {/* SECTION 2: MOVE-IN INFORMATION */}
+        {/* SECTION 3: MOVE-IN INFORMATION */}
         <Section id="section-moveInDate" title="Move-In Information">
           <Q
             id="q-moveInDate"
@@ -810,127 +932,8 @@ function Index() {
           </Q>
         </Section>
 
-        {/* SECTION 3: CONTACT DETAILS */}
-        <Section id="section-contact" title="Contact Details">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Q
-              id="q-firstName"
-              label="First name"
-              required
-              error={errors.firstName}
-            >
-              <input
-                id="field-firstName"
-                value={firstName}
-                placeholder="Jane"
-                onChange={(e) => {
-                  setFirstName(e.target.value);
-                  if (errors.firstName) setErrors((errs) => ({ ...errs, firstName: "" }));
-                }}
-                className={`spa-field font-medium ${
-                  errors.firstName ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
-                }`}
-              />
-            </Q>
-
-            <Q
-              id="q-lastName"
-              label="Last name"
-              required
-              error={errors.lastName}
-            >
-              <input
-                id="field-lastName"
-                value={lastName}
-                placeholder="Doe"
-                onChange={(e) => {
-                  setLastName(e.target.value);
-                  if (errors.lastName) setErrors((errs) => ({ ...errs, lastName: "" }));
-                }}
-                className={`spa-field font-medium ${
-                  errors.lastName ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
-                }`}
-              />
-            </Q>
-
-            <Q
-              id="q-email"
-              label="Email"
-              required
-              error={errors.email}
-            >
-              <input
-                id="field-email"
-                type="email"
-                value={email}
-                placeholder="jane.doe@example.com"
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errors.email) setErrors((errs) => ({ ...errs, email: "" }));
-                }}
-                className={`spa-field font-medium ${
-                  errors.email ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
-                }`}
-              />
-            </Q>
-
-            <Q
-              id="q-phone"
-              label="Phone number"
-              hint="USA 10-digit format only"
-              required
-              error={errors.phone}
-            >
-              <div className="relative">
-                <input
-                  id="field-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  placeholder="(555) 000-0000"
-                  maxLength={14}
-                  className={`spa-field font-medium tracking-wide ${
-                    errors.phone ? "border-red-500 bg-red-500/5 ring-1 ring-red-500/30" : ""
-                  }`}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground bg-secondary px-1.5 py-0.5 rounded border border-border">
-                  USA
-                </span>
-              </div>
-            </Q>
-          </div>
-
-          <Q id="q-source" label="How did you find this property?">
-            <select
-              id="field-source"
-              name="source"
-              aria-label="How did you find this property?"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              className="spa-field font-medium cursor-pointer"
-            >
-              <option value="">Select source...</option>
-              {[
-                ["ZILLOW", "Zillow"],
-                ["CRAIGSLIST", "Craigslist"],
-                ["APARTMENTS", "Apartments.com"],
-                ["REALTOR", "Realtor.com"],
-                ["FACEBOOK", "Facebook Marketplace"],
-                ["ZUMPER", "Zumper"],
-                ["APARTMENT_LIST", "Apartment List"],
-                ["HOMES_COM", "Homes.com"],
-                ["RENTLER", "Rentler"],
-                ["REFERRAL", "Friend or Family Referral"],
-                ["YARD_SIGN", "Yard Sign / Drove By"],
-                ["OTHER", "Other Source"],
-              ].map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Q>
-
+        {/* QUESTIONS FOR LANDLORD */}
+        <div id="section-questions" className="border-t border-border pt-8 space-y-4">
           <Q id="q-questions" label="Any questions for the landlord? (optional)">
             <textarea
               id="field-questions"
@@ -941,7 +944,7 @@ function Index() {
               className="spa-field font-medium"
             />
           </Q>
-        </Section>
+        </div>
 
         {/* Global validation summary alert if errors exist */}
         {Object.keys(errors).length > 0 && (
