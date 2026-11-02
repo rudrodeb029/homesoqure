@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Building2,
   PlusCircle,
@@ -22,6 +22,8 @@ import {
   MessageSquare,
   Send,
   MessageCircle,
+  Pencil,
+  Upload,
 } from "lucide-react";
 import {
   getProperties,
@@ -112,7 +114,20 @@ function WorkerPage() {
   const [zip, setZip] = useState("");
   const [price, setPrice] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Edit property state
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [editAddress, setEditAddress] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editStateCode, setEditStateCode] = useState("TX");
+  const [editZip, setEditZip] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [editPreviewUrl, setEditPreviewUrl] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Restore session
   useEffect(() => {
@@ -265,6 +280,7 @@ function WorkerPage() {
       price: Number(price) || 0,
       imageUrl: imageUrl.trim() || undefined,
       creditCheckUrl: settings.creditCheckUrl || "#",
+      previewUrl: previewUrl.trim() || undefined,
       supportPhone: settings.supportPhone,
       supportEmail: settings.supportEmail,
       notes: notes.trim(),
@@ -277,9 +293,62 @@ function WorkerPage() {
     setZip("");
     setPrice("");
     setImageUrl("");
+    setPreviewUrl("");
     setNotes("");
     setIsCreating(false);
     setProperties(getProperties());
+  };
+
+  const handleOpenEdit = (prop: Property) => {
+    setEditingProperty(prop);
+    setEditAddress(prop.address);
+    setEditCity(prop.city);
+    setEditStateCode(prop.state || "TX");
+    setEditZip(prop.zip);
+    setEditPrice(String(prop.price));
+    setEditImageUrl(prop.imageUrl || "");
+    setEditPreviewUrl(prop.previewUrl || "");
+    setEditNotes(prop.notes || "");
+  };
+
+  const handleSaveEditedProperty = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!worker || !editingProperty || !editAddress || !editCity || !editZip || !editPrice) return;
+    saveProperty(
+      {
+        address: editAddress.trim(),
+        city: editCity.trim(),
+        state: editStateCode.trim().toUpperCase(),
+        zip: editZip.trim(),
+        price: Number(editPrice) || 0,
+        imageUrl: editImageUrl.trim() || undefined,
+        creditCheckUrl: editingProperty.creditCheckUrl || settings.creditCheckUrl || "#",
+        previewUrl: editPreviewUrl.trim() || undefined,
+        supportPhone: editingProperty.supportPhone || settings.supportPhone,
+        supportEmail: editingProperty.supportEmail || settings.supportEmail,
+        notes: editNotes.trim(),
+        ownerId: worker.id,
+        ownerName: worker.name,
+        referralCode: worker.referralCode,
+      },
+      editingProperty.id
+    );
+    setEditingProperty(null);
+    setProperties(getProperties());
+  };
+
+  const handleEditImageFile = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setEditImageUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveEditImage = () => {
+    setEditImageUrl("");
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
+    }
   };
 
   const handleImageFile = (file?: File) => {
@@ -596,6 +665,23 @@ function WorkerPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+                  <span>External Listing Preview Link (Optional)</span>
+                  <span className="text-[0.68rem] text-muted-foreground font-normal">Shown as "Preview" on rental post</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://www.zillow.com/homedetails/... or external listing URL"
+                  value={previewUrl}
+                  onChange={(e) => setPreviewUrl(e.target.value)}
+                  className="spa-field"
+                />
+                <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                  When applicants view this property, a "Preview" link will open this external URL.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold mb-1">Property Description / Notes (Optional)</label>
                 <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="spa-field" />
               </div>
@@ -644,6 +730,17 @@ function WorkerPage() {
                         {p.city}, {p.state} {p.zip} · <strong className="text-foreground">${p.price}</strong> / month ·{" "}
                         {myLeads.filter((s) => s.propertyId === p.id).length} leads
                       </p>
+                      {p.previewUrl && (
+                        <a
+                          href={p.previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-flex items-center gap-1 text-[0.68rem] font-bold text-accent hover:underline bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20"
+                        >
+                          <ExternalLink className="h-2.5 w-2.5" />
+                          <span>Preview Link</span>
+                        </a>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -652,6 +749,13 @@ function WorkerPage() {
                       >
                         {copiedId === p.id ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
                         {copiedId === p.id ? "Copied!" : "Copy Link"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(p)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-semibold hover:bg-secondary cursor-pointer"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
                       </button>
                       <a
                         href={shareLink(p.id)}
@@ -953,6 +1057,177 @@ function WorkerPage() {
           )}
         </main>
       </div>
+
+      {/* Edit Property Modal */}
+      {editingProperty && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setEditingProperty(null)}
+        >
+          <div
+            className="bg-card rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-border my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                  <Pencil className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-foreground">Edit Rental Property</h3>
+                  <p className="text-xs text-muted-foreground">Update listing details and preview link</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProperty(null)}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedProperty} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Street Address *</label>
+                <input
+                  required
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="spa-field"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold mb-1 text-foreground">City *</label>
+                  <input
+                    required
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    className="spa-field"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">State (2 letters) *</label>
+                  <input
+                    required
+                    maxLength={2}
+                    value={editStateCode}
+                    onChange={(e) => setEditStateCode(e.target.value.toUpperCase())}
+                    className="spa-field uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">ZIP Code *</label>
+                  <input
+                    required
+                    value={editZip}
+                    onChange={(e) => setEditZip(e.target.value)}
+                    className="spa-field"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Monthly Rent ($ USD) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  className="spa-field"
+                />
+              </div>
+
+              {/* Photo Upload & URL */}
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Property Photo (Optional)</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/... or paste image URL"
+                    value={editImageUrl}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    className="spa-field flex-1 text-xs"
+                  />
+                  <input
+                    type="file"
+                    ref={editFileInputRef}
+                    accept="image/*"
+                    onChange={(e) => handleEditImageFile(e.target.files?.[0])}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary/80 transition cursor-pointer shrink-0"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Upload</span>
+                  </button>
+                  {editImageUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveEditImage}
+                      className="inline-flex items-center justify-center rounded-lg border border-border bg-secondary px-2.5 py-2 text-xs text-muted-foreground hover:text-destructive transition cursor-pointer shrink-0"
+                      title="Remove photo"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* External Preview Link */}
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground flex items-center justify-between">
+                  <span>External Listing Preview Link (Optional)</span>
+                  <span className="text-[0.68rem] text-muted-foreground font-normal">Shown as "Preview" on rental post</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://www.zillow.com/homedetails/... or external listing URL"
+                  value={editPreviewUrl}
+                  onChange={(e) => setEditPreviewUrl(e.target.value)}
+                  className="spa-field"
+                />
+                <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                  When applicants view this property, a "Preview" link will open this external URL.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Property Description / Notes (Optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Quiet neighborhood, updated kitchen, pet-friendly..."
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="spa-field"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border mt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingProperty(null)}
+                  className="rounded-full border border-border px-5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-primary px-6 py-2 text-xs font-semibold uppercase tracking-wider text-primary-foreground hover:bg-espresso cursor-pointer shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Screenshot modal */}
       {screenshot && (

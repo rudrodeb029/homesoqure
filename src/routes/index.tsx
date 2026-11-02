@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
 import { SpaShell } from "@/components/SpaShell";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, AlertCircle, Phone as PhoneIcon, Check } from "@/lib/lucide-react";
+import { Minus, Plus, AlertCircle, Phone as PhoneIcon, Check, ExternalLink } from "@/lib/lucide-react";
 import {
   getPropertyById,
   fetchPropertyFromCloud,
@@ -27,6 +27,14 @@ export const Route = createFileRoute("/")({
   }),
   component: Index,
 });
+
+function formatExternalUrl(url?: string): string {
+  if (!url) return "#";
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === "#") return "#";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 const employment = ["Employed full-time", "Employed part-time", "Self-employed", "Student", "Retired", "Other"];
 const credit = ["350 – 599", "600 – 649", "650 – 699", "700 – 749", "750 – 850", "I don't know my credit score"];
@@ -393,9 +401,23 @@ function Index() {
               <span className="eyebrow text-[0.6rem] font-bold text-primary">Active Rental Listing</span>
               <p className="font-serif text-lg font-bold text-foreground">{property.address}</p>
               <p className="text-muted-foreground font-medium">{property.city}, {property.state} {property.zip}</p>
-              <p className="mt-1 font-bold text-foreground">
-                ${property.price} <span className="font-normal text-muted-foreground">/ month</span>
-              </p>
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <p className="font-bold text-foreground">
+                  ${property.price} <span className="font-normal text-muted-foreground">/ month</span>
+                </p>
+                {property.previewUrl && property.previewUrl.trim() && property.previewUrl !== "#" ? (
+                  <a
+                    href={formatExternalUrl(property.previewUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md bg-secondary/80 hover:bg-secondary px-2 py-0.5 text-xs font-semibold text-primary hover:text-espresso border border-border/80 transition cursor-pointer"
+                    title="View property preview on external site"
+                  >
+                    <span>Preview</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

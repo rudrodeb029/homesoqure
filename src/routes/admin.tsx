@@ -31,6 +31,7 @@ import {
   Calendar,
   Share2,
   User,
+  Pencil,
 } from "lucide-react";
 import {
   getProperties,
@@ -182,11 +183,25 @@ function AdminPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [imageFileName, setImageFileName] = useState("");
   const [creditCheckUrl, setCreditCheckUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [supportPhone, setSupportPhone] = useState("+1 (646) 431-3060");
   const [supportEmail, setSupportEmail] = useState("landlord@homqero.com");
   const [notes, setNotes] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit property modal state
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [editAddress, setEditAddress] = useState("");
+  const [editCity, setEditCity] = useState("");
+  const [editState, setEditState] = useState("TX");
+  const [editZip, setEditZip] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [editImageFileName, setEditImageFileName] = useState("");
+  const [editPreviewUrl, setEditPreviewUrl] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const getStoredPassword = () => {
     if (typeof window === "undefined") return "admin123";
@@ -469,6 +484,7 @@ function AdminPage() {
       price: Number(price) || 0,
       imageUrl: imageUrl.trim() || undefined,
       creditCheckUrl: creditCheckUrl.trim() || "#",
+      previewUrl: previewUrl.trim() || undefined,
       supportPhone: supportPhone.trim() || settingsSupportPhone.trim() || "+1 (646) 431-3060",
       supportEmail: supportEmail.trim() || settingsSupportEmail.trim() || "landlord@homqero.com",
       notes: notes.trim(),
@@ -481,11 +497,71 @@ function AdminPage() {
     setPrice("");
     setImageUrl("");
     setImageFileName("");
+    setPreviewUrl("");
     setCreditCheckUrl(settingsCreditCheckUrl || siteSettings.creditCheckUrl || "");
     setSupportPhone(settingsSupportPhone || siteSettings.supportPhone || "+1 (646) 431-3060");
     setSupportEmail(settingsSupportEmail || siteSettings.supportEmail || "landlord@homqero.com");
     setNotes("");
     setIsCreating(false);
+    refreshData();
+  };
+
+  const handleOpenEdit = (prop: Property) => {
+    setEditingProperty(prop);
+    setEditAddress(prop.address);
+    setEditCity(prop.city);
+    setEditState(prop.state || "TX");
+    setEditZip(prop.zip);
+    setEditPrice(String(prop.price));
+    setEditImageUrl(prop.imageUrl || "");
+    setEditImageFileName("");
+    setEditPreviewUrl(prop.previewUrl || "");
+    setEditNotes(prop.notes || "");
+  };
+
+  const handleEditImageFile = (file?: File) => {
+    if (!file) return;
+    setEditImageFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditImageUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveEditImage = () => {
+    setEditImageUrl("");
+    setEditImageFileName("");
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
+    }
+  };
+
+  const handleSaveEditedProperty = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProperty || !editAddress || !editCity || !editZip || !editPrice) return;
+
+    saveProperty(
+      {
+        address: editAddress.trim(),
+        city: editCity.trim(),
+        state: editState.trim().toUpperCase(),
+        zip: editZip.trim(),
+        price: Number(editPrice) || 0,
+        imageUrl: editImageUrl.trim() || undefined,
+        creditCheckUrl: editingProperty.creditCheckUrl || "#",
+        previewUrl: editPreviewUrl.trim() || undefined,
+        supportPhone: editingProperty.supportPhone || settingsSupportPhone.trim() || "+1 (646) 431-3060",
+        supportEmail: editingProperty.supportEmail || settingsSupportEmail.trim() || "landlord@homqero.com",
+        notes: editNotes.trim(),
+        ownerId: editingProperty.ownerId,
+        ownerName: editingProperty.ownerName,
+        referralCode: editingProperty.referralCode,
+      },
+      editingProperty.id
+    );
+
+    setEditingProperty(null);
     refreshData();
   };
 
@@ -1258,6 +1334,23 @@ function AdminPage() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground flex items-center justify-between">
+                    <span>External Listing Preview Link <span className="font-normal text-muted-foreground">(Optional)</span></span>
+                    <span className="text-[0.68rem] text-muted-foreground font-normal">Shown as "Preview" on rental post</span>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="e.g. https://www.zillow.com/homedetails/... or external listing URL"
+                    value={previewUrl}
+                    onChange={(e) => setPreviewUrl(e.target.value)}
+                    className="spa-field"
+                  />
+                  <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                    When applicants view this property, a "Preview" link will open this external URL.
+                  </p>
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold mb-1 text-foreground">Property Description / Notes <span className="font-normal text-muted-foreground">(Optional)</span></label>
                   <textarea
                     rows={2}
@@ -1303,7 +1396,7 @@ function AdminPage() {
                   >
                     <option value="all">All (Admin + Workers)</option>
                     <option value="admin">Admin only</option>
-                    {workers.map((w) => (
+                    {(workers || []).map((w) => (
                       <option key={w.id} value={w.id}>
                         {w.name} ({w.referralCode})
                       </option>
@@ -1349,9 +1442,23 @@ function AdminPage() {
                             </span>
                             <h3 className="font-serif text-xl font-bold text-foreground">{prop.address}</h3>
                             <p className="text-xs text-muted-foreground">{prop.city}, {prop.state} {prop.zip}</p>
-                            <p className="mt-1 font-semibold text-primary">
-                              ${prop.price} <span className="font-normal text-xs text-muted-foreground">/ month</span>
-                            </p>
+                            <div className="mt-1 flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-primary">
+                                ${prop.price} <span className="font-normal text-xs text-muted-foreground">/ month</span>
+                              </p>
+                              {prop.previewUrl && (
+                                <a
+                                  href={prop.previewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[0.65rem] font-bold text-accent hover:underline bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20"
+                                  title={prop.previewUrl}
+                                >
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                  <span>Preview</span>
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -1376,6 +1483,15 @@ function AdminPage() {
                           >
                             {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                             <span>{isCopied ? "Copied!" : "Copy Link"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(prop)}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary/80 px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition shrink-0 cursor-pointer"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span>Edit</span>
                           </button>
 
                           <a
@@ -1434,7 +1550,7 @@ function AdminPage() {
                     >
                       <option value="all">All (Admin + Workers)</option>
                       <option value="admin">Admin only</option>
-                      {workers.map((w) => (
+                      {(workers || []).map((w) => (
                         <option key={w.id} value={w.id}>
                           {w.name} ({w.referralCode})
                         </option>
@@ -2901,7 +3017,7 @@ function AdminPage() {
                         <span>Action Checklist &amp; Landlord Recommendations</span>
                       </h5>
                       <ul className="space-y-1.5 pl-5 list-disc text-muted-foreground text-xs font-medium">
-                        {report.recommendations.map((r, i) => (
+                        {(report.recommendations || []).map((r, i) => (
                           <li key={i}>{r}</li>
                         ))}
                       </ul>
@@ -2971,6 +3087,186 @@ function AdminPage() {
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* EDIT PROPERTY MODAL */}
+      {/* ------------------------------------------------------------- */}
+      {editingProperty && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setEditingProperty(null)}
+        >
+          <div
+            className="relative max-h-[92vh] max-w-2xl w-full rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xs">
+                  <Pencil className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-foreground">
+                    Edit Rental Property
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    ID: {editingProperty.id}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEditingProperty(null)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Form Body */}
+            <form onSubmit={handleSaveEditedProperty} className="overflow-y-auto flex-1 pr-1 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Street Address *</label>
+                <input
+                  required
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="spa-field"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold mb-1 text-foreground">City *</label>
+                  <input
+                    required
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    className="spa-field"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">State (2 letters) *</label>
+                  <input
+                    required
+                    maxLength={2}
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value.toUpperCase())}
+                    className="spa-field uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">ZIP Code *</label>
+                  <input
+                    required
+                    value={editZip}
+                    onChange={(e) => setEditZip(e.target.value)}
+                    className="spa-field"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Monthly Rent ($ USD) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  className="spa-field"
+                />
+              </div>
+
+              {/* Photo Upload & URL */}
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Property Photo (Optional)</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/... or paste image URL"
+                    value={editImageUrl}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    className="spa-field flex-1 text-xs"
+                  />
+                  <input
+                    type="file"
+                    ref={editFileInputRef}
+                    accept="image/*"
+                    onChange={(e) => handleEditImageFile(e.target.files?.[0])}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary/80 transition cursor-pointer shrink-0"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Upload</span>
+                  </button>
+                  {editImageUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveEditImage}
+                      className="inline-flex items-center justify-center rounded-lg border border-border bg-secondary px-2.5 py-2 text-xs text-muted-foreground hover:text-destructive transition cursor-pointer shrink-0"
+                      title="Remove photo"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* External Preview Link */}
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground flex items-center justify-between">
+                  <span>External Listing Preview Link (Optional)</span>
+                  <span className="text-[0.68rem] text-muted-foreground font-normal">Shown as "Preview" on rental post</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://www.zillow.com/homedetails/... or external listing URL"
+                  value={editPreviewUrl}
+                  onChange={(e) => setEditPreviewUrl(e.target.value)}
+                  className="spa-field"
+                />
+                <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                  When applicants view this property, a "Preview" link will open this external URL.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Property Description / Notes (Optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Quiet neighborhood, updated kitchen, pet-friendly..."
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="spa-field"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-border mt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingProperty(null)}
+                  className="rounded-full border border-border px-5 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-primary px-6 py-2 text-xs font-semibold uppercase tracking-wider text-primary-foreground hover:bg-espresso cursor-pointer shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

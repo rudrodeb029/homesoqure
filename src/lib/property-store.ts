@@ -7,6 +7,7 @@ export interface Property {
   price: number;
   imageUrl?: string;
   creditCheckUrl?: string;
+  previewUrl?: string;
   supportPhone?: string;
   supportEmail?: string;
   notes?: string;
