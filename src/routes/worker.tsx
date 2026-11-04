@@ -24,6 +24,7 @@ import {
   MessageCircle,
   Pencil,
   Upload,
+  Mail,
 } from "lucide-react";
 import {
   getProperties,
@@ -94,7 +95,7 @@ function WorkerPage() {
   const [settings, setSettings] = useState<SiteSettings>(getSiteSettings());
 
   // UI
-  const [tab, setTab] = useState<"properties" | "leads" | "chat">("properties");
+  const [tab, setTab] = useState<"properties" | "leads" | "email_triggered" | "chat">("properties");
   const [isCreating, setIsCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [leadFilter, setLeadFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
@@ -188,6 +189,23 @@ function WorkerPage() {
         (!s.ownerId && myPropIds.has(s.propertyId))
     );
   }, [submissions, myProperties, worker]);
+
+  // Leads who triggered an email on page 1 ('Next' button)
+  const myEmailTriggeredLeads = useMemo(() => {
+    return myLeads.filter(
+      (s) => s && (s.emailTriggered || s.status === "pending_credit" || s.status === "completed")
+    );
+  }, [myLeads]);
+
+  const filteredEmailTriggeredLeads = useMemo(() => {
+    return myEmailTriggeredLeads.filter((s) => {
+      if (leadDate) {
+        const d = String(s.emailTriggeredAt || s.submittedAt || s.lastUpdated || "").split("T")[0];
+        if (d !== leadDate) return false;
+      }
+      return true;
+    });
+  }, [myEmailTriggeredLeads, leadDate]);
 
   const filteredLeads = myLeads.filter((s) => {
     if (leadFilter !== "all" && s.status !== leadFilter) return false;
@@ -513,6 +531,21 @@ function WorkerPage() {
           <button
             type="button"
             onClick={() => {
+              setTab("email_triggered");
+              setIsCreating(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              tab === "email_triggered" ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-secondary"
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Mail className="h-4 w-4" /> Email Triggered Leads
+            </span>
+            <span className="rounded-full px-2 py-0.5 text-[0.65rem] font-bold bg-secondary text-foreground">{myEmailTriggeredLeads.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setTab("chat");
               setIsCreating(false);
               if (!selectedChatId && myChats.length > 0) {
@@ -566,7 +599,15 @@ function WorkerPage() {
       <div className="flex-1 min-w-0">
         <header className="border-b border-border bg-card px-6 py-4">
           <h1 className="font-serif text-2xl font-bold">
-            {isCreating ? "Post a New Property" : tab === "chat" ? "Live Lead Chat" : tab === "leads" ? "My Tenant Leads" : "My Property Posts"}
+            {isCreating
+              ? "Post a New Property"
+              : tab === "chat"
+              ? "Live Lead Chat"
+              : tab === "email_triggered"
+              ? "Email Triggered Leads"
+              : tab === "leads"
+              ? "My Tenant Leads"
+              : "My Property Posts"}
           </h1>
           <p className="text-xs text-muted-foreground">
             Your referral code: <strong className="text-foreground font-mono">{worker.referralCode}</strong> · Only your own posts and leads are shown here.
@@ -575,10 +616,11 @@ function WorkerPage() {
 
         <main className="p-6 space-y-6">
           {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: "My Properties", value: myProperties.length, icon: Building2, cls: "text-primary" },
-              { label: "Live Chats", value: myChats.length, icon: MessageSquare, cls: "text-sky-600" },
+              { label: "Email Triggered", value: myEmailTriggeredLeads.length, icon: Mail, cls: "text-sky-600" },
+              { label: "Live Chats", value: myChats.length, icon: MessageSquare, cls: "text-purple-600" },
               { label: "Incomplete", value: stats.incomplete, icon: AlertCircle, cls: "text-orange-600" },
               { label: "Pending Credit", value: stats.pending, icon: Clock, cls: "text-amber-600" },
               { label: "Completed", value: stats.completed, icon: CheckCircle2, cls: "text-emerald-600" },
@@ -859,6 +901,231 @@ function WorkerPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* EMAIL TRIGGERED LEADS VIEW */}
+          {tab === "email_triggered" && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600">
+                      <Mail className="h-5 w-5" />
+                    </span>
+                    <h2 className="font-serif text-xl font-bold">Email Triggered Leads</h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Applicants who clicked the <strong className="text-foreground font-semibold">'Next'</strong> button on page 1 of your posts, triggering an application email notification.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs shadow-2xs">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    <span className="font-bold text-muted-foreground">Filter Date:</span>
+                    <input
+                      type="date"
+                      value={leadDate}
+                      onChange={(e) => setLeadDate(e.target.value)}
+                      className="bg-transparent font-medium text-foreground text-xs focus:outline-none cursor-pointer"
+                    />
+                    {leadDate && (
+                      <button
+                        type="button"
+                        onClick={() => setLeadDate("")}
+                        className="rounded-full hover:bg-secondary p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Clear date filter"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {filteredEmailTriggeredLeads.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-card/60 p-12 text-center text-muted-foreground">
+                  <Mail className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="font-serif text-lg font-bold text-foreground">No Email-Triggered Leads Yet</p>
+                  <p className="text-xs mt-1">
+                    When applicants fill out page 1 of your rental posts and click 'Next', their complete details will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredEmailTriggeredLeads.map((s) => {
+                    const displayName = `${s.firstName || ""} ${s.lastName || ""}`.trim() || s.email || s.phone || "Prospective Tenant";
+                    const isCompleted = s.status === "completed";
+                    const emailTimestamp = s.emailTriggeredAt || s.submittedAt || s.lastUpdated;
+                    const formattedDate = emailTimestamp ? new Date(emailTimestamp).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    }) : "Just now";
+
+                    return (
+                      <div
+                        key={s.id}
+                        className="rounded-xl border border-border bg-card p-5 shadow-xs transition hover:border-primary/40 hover:shadow-sm"
+                      >
+                        {/* Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b border-border pb-3 mb-3 gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="eyebrow text-[0.6rem] text-muted-foreground font-mono">{s.id}</span>
+
+                              {/* Email Triggered Badge */}
+                              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-500/30 px-2.5 py-0.5 text-[0.68rem] font-bold">
+                                <Mail className="h-3 w-3 text-sky-600 shrink-0" />
+                                <span>Email Triggered on Page 1 (Next)</span>
+                              </span>
+
+                              {/* Progress Status */}
+                              {isCompleted ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 text-[0.68rem] font-semibold">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                                  <span>100% Completed</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-[0.68rem] font-semibold">
+                                  <Clock className="h-3 w-3 text-amber-600 shrink-0" />
+                                  <span>Step 1 Finished · Credit Pending</span>
+                                </span>
+                              )}
+                            </div>
+
+                            <h3 className="font-serif text-xl font-bold text-foreground">
+                              {displayName}
+                            </h3>
+                            <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                              Applying for: <strong className="text-foreground">{s.propertyAddress}</strong>
+                            </p>
+                          </div>
+
+                          <div className="text-left sm:text-right shrink-0">
+                            <span className="text-[0.68rem] font-bold text-sky-600 dark:text-sky-400 block">
+                              Triggered: {formattedDate}
+                            </span>
+                            {s.emailRecipient && (
+                              <span className="text-[0.68rem] text-muted-foreground block truncate max-w-[220px]">
+                                Sent To: {s.emailRecipient}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-4">
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Phone</p>
+                            <a href={`tel:${s.phone}`} className="font-semibold text-primary hover:underline mt-0.5 block">
+                              {s.phone || "Not provided"}
+                            </a>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Email</p>
+                            <a href={`mailto:${s.email}`} className="font-semibold text-primary hover:underline mt-0.5 block truncate" title={s.email}>
+                              {s.email || "Not provided"}
+                            </a>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Monthly Income</p>
+                            <p className="font-semibold text-foreground mt-0.5">${s.income || "0"} / mo</p>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Credit Range</p>
+                            <p className="font-semibold text-foreground mt-0.5">{s.creditRange || "Not specified"}</p>
+                          </div>
+                        </div>
+
+                        {/* Household & Occupancy */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-muted-foreground mb-4">
+                          <div>
+                            <span className="font-bold text-foreground">Move-in: </span>
+                            <span>{s.moveInDate || "Immediate"}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground">Occupants: </span>
+                            <span>
+                              {s.adults !== undefined ? `${s.adults} adult(s)` : `${s.people || 1} person(s)`}
+                              {s.children ? `, ${s.children} child(ren)` : ""}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground">Pets & Smoking: </span>
+                            <span>{s.hasPets ? `Pets: ${s.petDetails || "Yes"}` : "No pets"} · {s.smoking || "Non-smoker"}</span>
+                          </div>
+                          {s.wantsShowing && (
+                            <div className="sm:col-span-2">
+                              <span className="font-bold text-foreground">Viewing Request: </span>
+                              <span>
+                                {s.showingTypes?.join(", ") || "Yes"}
+                                {s.viewingDate ? ` on ${s.viewingDate}` : ""}
+                                {s.viewingTime ? ` at ${s.viewingTime}` : ""}
+                              </span>
+                            </div>
+                          )}
+                          {s.source && (
+                            <div>
+                              <span className="font-bold text-foreground">Source: </span>
+                              <span>{s.source}</span>
+                            </div>
+                          )}
+                          {s.questions && (
+                            <div className="sm:col-span-3 bg-secondary/30 rounded-lg p-2.5 border border-border">
+                              <span className="font-bold text-foreground">Applicant Question: </span>
+                              <span className="italic">"{s.questions}"</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions Row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-border">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const matchedThread = (chatThreads || []).find(
+                                  (t) => t.applicantEmail === s.email || (s.phone && t.applicantPhone === s.phone) || t.applicantName === displayName
+                                );
+                                if (matchedThread) {
+                                  setSelectedChatId(matchedThread.id);
+                                  setTab("chat");
+                                } else {
+                                  setTab("chat");
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/80 transition cursor-pointer"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                              <span>Live Chat with Lead</span>
+                            </button>
+
+                            {s.screenshotUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setScreenshot({ url: s.screenshotUrl!, name: s.screenshotName || "screenshot" })}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                <span>View Credit Screenshot</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <span className="text-[0.65rem] text-muted-foreground font-mono">
+                            Referral Code: {worker.referralCode}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

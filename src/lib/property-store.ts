@@ -71,6 +71,10 @@ export interface Submission {
   referralCode?: string;
   submittedAt: string;
   lastUpdated: string;
+  /** Triggered by 'Next' button on first page */
+  emailTriggered?: boolean;
+  emailTriggeredAt?: string;
+  emailRecipient?: string;
 }
 
 export const DEFAULT_PROPERTY: Property = {
@@ -415,14 +419,25 @@ export function saveOrUpdateDraftLead(draft: Partial<Submission>): Submission | 
 }
 
 /**
- * Marks submission as progressed to Step 2 (Pending Credit Screenshot)
+ * Marks submission as progressed to Step 2 (Pending Credit Screenshot) and records email trigger
  */
 export function saveStepOneSubmission(submission: Partial<Submission>): Submission {
+  const now = new Date().toISOString();
   const result = saveOrUpdateDraftLead({
     ...submission,
-    status: "pending_credit",
+    status: submission.status || "pending_credit",
+    emailTriggered: true,
+    emailTriggeredAt: submission.emailTriggeredAt || now,
   });
   return result!;
+}
+
+/**
+ * Checks whether an applicant triggered an email on the first page
+ */
+export function isEmailTriggeredLead(s?: Partial<Submission> | null): boolean {
+  if (!s) return false;
+  return Boolean(s.emailTriggered || s.status === "pending_credit" || s.status === "completed");
 }
 
 export function getLatestSubmission(): Submission | null {

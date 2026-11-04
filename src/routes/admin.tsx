@@ -88,8 +88,8 @@ function AdminPage() {
   const [passwordError, setPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Tab state: "properties" | "submissions" | "chat" | "settings" | "security"
-  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "chat" | "workers" | "settings" | "security">("properties");
+  // Tab state: "properties" | "submissions" | "email_triggered" | "chat" | "workers" | "settings" | "security"
+  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "email_triggered" | "chat" | "workers" | "settings" | "security">("properties");
   const [submissionFilter, setSubmissionFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
   const [selectedScreenshotModal, setSelectedScreenshotModal] = useState<{
     url: string;
@@ -643,6 +643,12 @@ function AdminPage() {
   const incompleteCount = safeSubmissions.filter((s) => s?.status === "incomplete").length;
   const unreadChatsCount = safeChatThreads.reduce((sum, t) => sum + ((t?.unreadAdminCount || 0) > 0 ? 1 : 0), 0);
 
+  // Separate collection of users who triggered an email on the first page
+  const emailTriggeredSubmissions = safeSubmissions.filter(
+    (s) => s && (s.emailTriggered || s.status === "pending_credit" || s.status === "completed")
+  );
+  const emailTriggeredCount = emailTriggeredSubmissions.length;
+
   const matchesWorkerFilter = (ownerId?: string) => {
     if (workerFilter === "all") return true;
     if (workerFilter === "admin") return !ownerId;
@@ -670,6 +676,16 @@ function AdminPage() {
       if (subDate !== submissionDateFilter) {
         return false;
       }
+    }
+    return true;
+  });
+
+  const filteredEmailTriggeredSubmissions = emailTriggeredSubmissions.filter((s) => {
+    if (!s) return false;
+    if (!matchesWorkerFilter(s.ownerId)) return false;
+    if (submissionDateFilter) {
+      const subDate = String(s.emailTriggeredAt || s.submittedAt || s.lastUpdated || "").split("T")[0];
+      if (subDate !== submissionDateFilter) return false;
     }
     return true;
   });
@@ -840,6 +856,30 @@ function AdminPage() {
             </div>
           </button>
 
+          {/* Email Triggered Leads (First Page 'Next' Button Triggered) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("email_triggered");
+              setIsCreating(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === "email_triggered"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-foreground/80 hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Mail className="h-4 w-4" />
+              <span>Email Triggered Leads</span>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${
+              activeTab === "email_triggered" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-secondary text-foreground"
+            }`}>
+              {emailTriggeredCount}
+            </span>
+          </button>
+
           {/* 3. Live Tenant Chat */}
           <button
             type="button"
@@ -1006,6 +1046,8 @@ function AdminPage() {
                 ? "Worker Referral Accounts & Performance"
                 : activeTab === "chat"
                 ? "Live Landlord Chat Support"
+                : activeTab === "email_triggered"
+                ? "Email Triggered Applicant Leads"
                 : activeTab === "submissions"
                 ? "Tenant Prescreening Submissions"
                 : isCreating
@@ -1023,6 +1065,8 @@ function AdminPage() {
                 ? "Manage worker accounts, assign unique referral codes, and review individual performance across all worker posts."
                 : activeTab === "chat"
                 ? "Chat directly in real-time with prospective tenants visiting your rental listings."
+                : activeTab === "email_triggered"
+                ? "Details of all applicants who clicked 'Next' on the first page, triggering an instant email notification to the landlord or assigned worker."
                 : activeTab === "submissions"
                 ? "Review submitted applicant income, move-in details, deep analysis, and credit score screenshots."
                 : "Manage property listings, photos, and shareable tenant prescreening links."}
@@ -1046,7 +1090,7 @@ function AdminPage() {
         <main className="p-6 max-w-6xl w-full">
           {/* Quick Metrics Bar */}
           {activeTab !== "security" && activeTab !== "settings" && activeTab !== "workers" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
               <div
                 onClick={() => {
                   setActiveTab("properties");
@@ -1063,6 +1107,26 @@ function AdminPage() {
                   </div>
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-primary">
                     <Building2 className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => {
+                  setActiveTab("email_triggered");
+                  setIsCreating(false);
+                }}
+                className={`cursor-pointer rounded-xl border p-4 transition shadow-xs ${
+                  activeTab === "email_triggered" ? "border-sky-500 bg-sky-500/10 ring-1 ring-sky-500/30" : "border-border bg-card hover:border-sky-500/40"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="eyebrow text-[0.6rem] text-sky-600 dark:text-sky-400 font-semibold">Email Triggered</p>
+                    <p className="mt-1 font-serif text-2xl font-bold text-sky-600 dark:text-sky-400">{emailTriggeredCount}</p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/15 text-sky-600">
+                    <Mail className="h-5 w-5" />
                   </div>
                 </div>
               </div>
@@ -1968,6 +2032,275 @@ function AdminPage() {
                           <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
                             <Mail className="h-3.5 w-3.5 text-primary" />
                             <span>Contact: <strong className="text-foreground">{sub.email || sub.phone || "No direct contact"}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ------------------------------------------------------- */}
+          {/* VIEW: EMAIL TRIGGERED APPLICANTS (PAGE 1 'NEXT' BUTTON) */}
+          {/* ------------------------------------------------------- */}
+          {activeTab === "email_triggered" && (
+            <div className="space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600">
+                      <Mail className="h-5 w-5" />
+                    </span>
+                    <h2 className="font-serif text-xl font-bold">Email Triggered Leads</h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    All applicants who clicked the <strong className="text-foreground font-semibold">'Next'</strong> button on page 1, triggering an instant email notification to the landlord/worker.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Filter by Worker */}
+                  <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs shadow-2xs">
+                    <label className="font-bold text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                      <User className="h-3.5 w-3.5 text-primary" />
+                      <span>Worker:</span>
+                    </label>
+                    <select
+                      value={workerFilter}
+                      onChange={(e) => setWorkerFilter(e.target.value)}
+                      className="bg-transparent font-medium text-foreground text-xs focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">All (Admin + Workers)</option>
+                      <option value="admin">Admin only</option>
+                      {(workers || []).map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({w.referralCode})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Search by Date */}
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs shadow-2xs">
+                    <label htmlFor="admin-email-date-filter" className="flex items-center gap-1.5 font-bold text-muted-foreground whitespace-nowrap">
+                      <Calendar className="h-3.5 w-3.5 text-primary" />
+                      <span>Search Date:</span>
+                    </label>
+                    <input
+                      id="admin-email-date-filter"
+                      type="date"
+                      value={submissionDateFilter}
+                      onChange={(e) => setSubmissionDateFilter(e.target.value)}
+                      className="bg-transparent font-medium text-foreground text-xs focus:outline-none cursor-pointer"
+                    />
+                    {submissionDateFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setSubmissionDateFilter("")}
+                        className="rounded-full hover:bg-secondary p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Clear date filter"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {filteredEmailTriggeredSubmissions.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-card/60 p-12 text-center text-muted-foreground">
+                  <Mail className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="font-serif text-lg font-bold text-foreground">No Email-Triggered Leads Found</p>
+                  <p className="text-xs mt-1">
+                    When applicants fill out page 1 of a rental posting and click 'Next', their full details and triggered email record will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredEmailTriggeredSubmissions.map((sub) => {
+                    const displayName = `${sub.firstName || ""} ${sub.lastName || ""}`.trim() || sub.email || sub.phone || "Prospective Tenant";
+                    const isCompleted = sub.status === "completed";
+                    const emailTimestamp = sub.emailTriggeredAt || sub.submittedAt || sub.lastUpdated;
+                    const formattedDate = emailTimestamp ? new Date(emailTimestamp).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    }) : "Just now";
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className="rounded-xl border border-border bg-card p-5 shadow-xs transition hover:border-primary/40 hover:shadow-sm"
+                      >
+                        {/* Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b border-border pb-3 mb-3 gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="eyebrow text-[0.6rem] text-muted-foreground font-mono">{sub.id}</span>
+
+                              {/* Email Triggered Pill */}
+                              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-500/30 px-2.5 py-0.5 text-[0.68rem] font-bold">
+                                <Mail className="h-3 w-3 text-sky-600 shrink-0" />
+                                <span>Email Triggered on Page 1 (Next)</span>
+                              </span>
+
+                              {/* Progress Status */}
+                              {isCompleted ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 text-[0.68rem] font-semibold">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                                  <span>100% Completed (Credit Uploaded)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-[0.68rem] font-semibold">
+                                  <Clock className="h-3 w-3 text-amber-600 shrink-0" />
+                                  <span>Step 1 Finished · Credit Pending</span>
+                                </span>
+                              )}
+
+                              {/* Worker Attribution */}
+                              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[0.65rem] font-bold text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span>
+                                  {sub.ownerName || sub.ownerId
+                                    ? `Worker: ${sub.ownerName || "Assigned"} (${sub.referralCode || ""})`
+                                    : sub.referralCode
+                                    ? `Ref: ${sub.referralCode}`
+                                    : "Admin Direct"}
+                                </span>
+                              </span>
+                            </div>
+
+                            <h3 className="font-serif text-xl font-bold text-foreground">
+                              {displayName}
+                            </h3>
+                            <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                              Applying for: <strong className="text-foreground">{sub.propertyAddress}</strong>
+                            </p>
+                          </div>
+
+                          <div className="text-left sm:text-right shrink-0">
+                            <span className="text-[0.68rem] font-bold text-sky-600 dark:text-sky-400 block">
+                              Triggered: {formattedDate}
+                            </span>
+                            {sub.emailRecipient && (
+                              <span className="text-[0.68rem] text-muted-foreground block truncate max-w-[220px]">
+                                Sent To: {sub.emailRecipient}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-4">
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Phone</p>
+                            <a href={`tel:${sub.phone}`} className="font-semibold text-primary hover:underline mt-0.5 block">
+                              {sub.phone || "Not provided"}
+                            </a>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Email</p>
+                            <a href={`mailto:${sub.email}`} className="font-semibold text-primary hover:underline mt-0.5 block truncate" title={sub.email}>
+                              {sub.email || "Not provided"}
+                            </a>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Monthly Income</p>
+                            <p className="font-semibold text-foreground mt-0.5">${sub.income || "0"} / mo</p>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p className="text-[0.65rem] font-bold text-muted-foreground uppercase">Credit Range</p>
+                            <p className="font-semibold text-foreground mt-0.5">{sub.creditRange || "Not specified"}</p>
+                          </div>
+                        </div>
+
+                        {/* Extra application info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-muted-foreground mb-4">
+                          <div>
+                            <span className="font-bold text-foreground">Move-in: </span>
+                            <span>{sub.moveInDate || "Immediate"}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground">Occupants: </span>
+                            <span>
+                              {sub.adults !== undefined ? `${sub.adults} adult(s)` : `${sub.people || 1} person(s)`}
+                              {sub.children ? `, ${sub.children} child(ren)` : ""}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground">Pets & Smoking: </span>
+                            <span>{sub.hasPets ? `Pets: ${sub.petDetails || "Yes"}` : "No pets"} · {sub.smoking || "Non-smoker"}</span>
+                          </div>
+                          {sub.wantsShowing && (
+                            <div className="sm:col-span-2">
+                              <span className="font-bold text-foreground">Viewing Request: </span>
+                              <span>
+                                {sub.showingTypes?.join(", ") || "Yes"}
+                                {sub.viewingDate ? ` on ${sub.viewingDate}` : ""}
+                                {sub.viewingTime ? ` at ${sub.viewingTime}` : ""}
+                              </span>
+                            </div>
+                          )}
+                          {sub.source && (
+                            <div>
+                              <span className="font-bold text-foreground">Source: </span>
+                              <span>{sub.source}</span>
+                            </div>
+                          )}
+                          {sub.questions && (
+                            <div className="sm:col-span-3 bg-secondary/30 rounded-lg p-2.5 border border-border">
+                              <span className="font-bold text-foreground">Applicant Question: </span>
+                              <span className="italic">"{sub.questions}"</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions Row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-border">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openDeepAnalysis(sub)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground transition cursor-pointer"
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              <span>View Deep Analysis & Email</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const matchedThread = chatThreads.find(
+                                  (t) => t.applicantEmail === sub.email || (sub.phone && t.applicantPhone === sub.phone) || t.applicantName === displayName
+                                );
+                                if (matchedThread) {
+                                  setSelectedChatId(matchedThread.id);
+                                  setActiveTab("chat");
+                                } else {
+                                  setActiveTab("chat");
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/80 transition cursor-pointer"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                              <span>Live Chat</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubmission(sub.id)}
+                              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Delete</span>
+                            </button>
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useRef, useState, useEffect } from "react";
 import { ArrowRight, Upload, Check, X, AlertCircle } from "@/lib/lucide-react";
 import { SpaShell } from "@/components/SpaShell";
@@ -184,6 +184,9 @@ function Success() {
 
     setIsSubmitting(true);
     markSubmissionCompleted(fileName, fileDataUrl);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("homqero_completed_final", "true");
+    }
 
     // 1. Dispatch final completed application email to Firestore mail queue & local analysis
     let targetLandlordEmail = settings.supportEmail;
@@ -201,10 +204,8 @@ function Success() {
 
     dispatchApplicationEmail(completedSubmission, property, targetLandlordEmail);
 
-    // 2. Open Gmail compose section with pre-filled recipient, title, and all information
-    openGmailInstantly(completedSubmission, property, targetLandlordEmail);
-
-    // 3. Immediately transition the website to the Under Landlord Review confirmation screen
+    // 2. Email trigger moved to first page 'Next' button per user specification.
+    // Transition to the final Under Landlord Review confirmation screen.
     setTimeout(() => {
       navigate({
         to: "/confirmation",
@@ -217,10 +218,19 @@ function Success() {
     <SpaShell>
       <div className="mx-auto max-w-[520px]">
         {/* Selected Property Header Tag */}
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/80 px-3 py-1 text-xs text-muted-foreground">
-          <span>Applying for:</span>
-          <strong className="text-foreground">{property.address}, {property.city}</strong>
-          <span>(${property.price}/mo)</span>
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/80 px-3 py-1 text-xs text-muted-foreground">
+            <span>Applying for:</span>
+            <strong className="text-foreground">{property.address}, {property.city}</strong>
+            <span>(${property.price}/mo)</span>
+          </div>
+          <Link
+            to="/"
+            search={property.id ? { p: property.id, edit: "1" } : { edit: "1" }}
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            ← Edit step 1 details
+          </Link>
         </div>
 
         <h1 className="font-serif text-4xl font-bold text-foreground">

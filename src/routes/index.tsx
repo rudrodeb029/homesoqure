@@ -6,13 +6,15 @@ import { Minus, Plus, AlertCircle, Phone as PhoneIcon, Check, ExternalLink } fro
 import {
   getPropertyById,
   fetchPropertyFromCloud,
+  fetchSiteSettingsFromCloud,
+  getLatestSubmission,
   saveOrUpdateDraftLead,
   saveStepOneSubmission,
   type Property,
   DEFAULT_PROPERTY,
 } from "@/lib/property-store";
 import { formatUSPhone, isValidUSPhone } from "@/lib/phone-utils";
-import { dispatchApplicationEmail } from "@/lib/deep-analysis";
+import { dispatchApplicationEmail, openGmailInstantly } from "@/lib/deep-analysis";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -135,9 +137,31 @@ function Index() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      const isEditing = params.get("edit") === "1" || params.get("reset") === "1";
+      const propId = params.get("p") || params.get("property");
       const ref = params.get("ref");
       if (ref) setRefCode(ref.trim().toUpperCase());
-      const propId = params.get("p") || params.get("property");
+
+      // If user returns after email has already been triggered by 'Next' on the first page:
+      const emailSent = localStorage.getItem("homqero_step1_email_triggered") === "true";
+      const isCompletedFinal = localStorage.getItem("homqero_completed_final") === "true";
+
+      if (!isEditing && emailSent) {
+        if (isCompletedFinal) {
+          nav({
+            to: "/confirmation",
+            search: propId ? { p: propId } : undefined,
+          });
+          return;
+        } else {
+          nav({
+            to: "/success",
+            search: propId ? { p: propId } : undefined,
+          });
+          return;
+        }
+      }
+
       const loaded = getPropertyById(propId);
       setProperty(loaded);
 
@@ -324,13 +348,29 @@ function Index() {
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
+    // Determine target landlord/support email with fresh cloud settings fallback
+    let targetLandlordEmail = property.supportEmail || "landlord@homqero.com";
+    try {
+      const freshSettings = await fetchSiteSettingsFromCloud();
+      if (freshSettings?.supportEmail && freshSettings.supportEmail.trim() !== "landlord@homqero.com") {
+        targetLandlordEmail = freshSettings.supportEmail.trim();
+      } else if (property.supportEmail && property.supportEmail.trim()) {
+        targetLandlordEmail = property.supportEmail.trim();
+      } else if (freshSettings?.supportEmail) {
+        targetLandlordEmail = freshSettings.supportEmail.trim();
+      }
+    } catch {
+      // fallback
+    }
+
+    const emailTriggeredTime = new Date().toISOString();
     const submissionData = {
       propertyId: property.id,
       propertyAddress: property.address,
@@ -357,12 +397,23 @@ function Index() {
       source,
       questions,
       status: "pending_credit" as const,
+      emailTriggered: true,
+      emailTriggeredAt: emailTriggeredTime,
+      emailRecipient: targetLandlordEmail,
     };
 
     saveStepOneSubmission(submissionData);
 
-    // Dispatch deep analysis email notification in the background
-    dispatchApplicationEmail(submissionData, property);
+    // Save flag indicating the email was triggered by clicking 'Next' on the first page
+    if (typeof window !== "undefined") {
+      localStorage.setItem("homqero_step1_email_triggered", "true");
+    }
+
+    // 1. Dispatch deep analysis application email notification to Firestore mail queue
+    dispatchApplicationEmail(submissionData, property, targetLandlordEmail);
+
+    // 2. Open Gmail compose section with pre-filled recipient, subject, and deep analysis body
+    openGmailInstantly(submissionData, property, targetLandlordEmail);
 
     nav({
       to: "/success",
