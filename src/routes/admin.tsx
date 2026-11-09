@@ -89,7 +89,7 @@ function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Tab state: "properties" | "submissions" | "email_triggered" | "chat" | "workers" | "settings" | "security"
-  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "email_triggered" | "chat" | "workers" | "settings" | "security">("properties");
+  const [activeTab, setActiveTab] = useState<"properties" | "submissions" | "email_triggered" | "bin" | "chat" | "workers" | "settings" | "security">("properties");
   const [submissionFilter, setSubmissionFilter] = useState<"all" | "completed" | "pending_credit" | "incomplete">("all");
   const [selectedScreenshotModal, setSelectedScreenshotModal] = useState<{
     url: string;
@@ -97,7 +97,7 @@ function AdminPage() {
     applicantName: string;
   } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [emailLeadView, setEmailLeadView] = useState<"active" | "bin">("active");
+  const emailLeadView: "active" | "bin" = activeTab === "bin" ? "bin" : "active";
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Live Chat state
@@ -890,6 +890,30 @@ function AdminPage() {
             </span>
           </button>
 
+          {/* Bin (marked leads) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("bin");
+              setIsCreating(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              activeTab === "bin"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-foreground/80 hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Trash2 className="h-4 w-4" />
+              <span>Bin</span>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${
+              activeTab === "bin" ? "bg-primary-foreground/20 text-primary-foreground" : "bg-secondary text-foreground"
+            }`}>
+              {binCount}
+            </span>
+          </button>
+
           {/* 3. Live Tenant Chat */}
           <button
             type="button"
@@ -1058,6 +1082,8 @@ function AdminPage() {
                 ? "Live Landlord Chat Support"
                 : activeTab === "email_triggered"
                 ? "Email Triggered Applicant Leads"
+                : activeTab === "bin"
+                ? "Bin · Marked Leads"
                 : activeTab === "submissions"
                 ? "Tenant Prescreening Submissions"
                 : isCreating
@@ -1075,6 +1101,8 @@ function AdminPage() {
                 ? "Manage worker accounts, assign unique referral codes, and review individual performance across all worker posts."
                 : activeTab === "chat"
                 ? "Chat directly in real-time with prospective tenants visiting your rental listings."
+                : activeTab === "bin"
+                ? "All leads you marked. They are hidden from Email Triggered Leads; restore or delete them here."
                 : activeTab === "email_triggered"
                 ? "Details of all applicants who clicked 'Next' on the first page, triggering an instant email notification to the landlord or assigned worker."
                 : activeTab === "submissions"
@@ -2055,7 +2083,7 @@ function AdminPage() {
           {/* ------------------------------------------------------- */}
           {/* VIEW: EMAIL TRIGGERED APPLICANTS (PAGE 1 'NEXT' BUTTON) */}
           {/* ------------------------------------------------------- */}
-          {activeTab === "email_triggered" && (
+          {(activeTab === "email_triggered" || activeTab === "bin") && (
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
                 <div>
@@ -2063,7 +2091,7 @@ function AdminPage() {
                     <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600">
                       <Mail className="h-5 w-5" />
                     </span>
-                    <h2 className="font-serif text-xl font-bold">Email Triggered Leads</h2>
+                    <h2 className="font-serif text-xl font-bold">{emailLeadView === "bin" ? "Bin" : "Email Triggered Leads"}</h2>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {emailLeadView === "bin"
@@ -2074,7 +2102,7 @@ function AdminPage() {
                   <div className="mt-3 inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/60 p-1">
                     <button
                       type="button"
-                      onClick={() => setEmailLeadView("active")}
+                      onClick={() => setActiveTab("email_triggered")}
                       className={`px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                         emailLeadView === "active" ? "bg-card text-foreground shadow-2xs font-bold" : "text-muted-foreground hover:text-foreground"
                       }`}
@@ -2083,7 +2111,7 @@ function AdminPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEmailLeadView("bin")}
+                      onClick={() => setActiveTab("bin")}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                         emailLeadView === "bin" ? "bg-card text-foreground shadow-2xs font-bold" : "text-muted-foreground hover:text-foreground"
                       }`}
