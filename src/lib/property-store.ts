@@ -75,6 +75,9 @@ export interface Submission {
   emailTriggered?: boolean;
   emailTriggeredAt?: string;
   emailRecipient?: string;
+  /** Admin marked this lead -> moved to Bin */
+  marked?: boolean;
+  markedAt?: string;
 }
 
 export const DEFAULT_PROPERTY: Property = {
@@ -483,6 +486,24 @@ export function markSubmissionCompleted(screenshotName: string, screenshotUrl?: 
 }
 
 export const updateLatestSubmissionScreenshot = markSubmissionCompleted;
+
+/**
+ * Marks (moves to Bin) or restores a submission. Synced to Firestore.
+ */
+export function setSubmissionMarked(id: string, marked: boolean): void {
+  if (typeof window === "undefined") return;
+  const list = getSubmissions();
+  const idx = list.findIndex((s) => s.id === id);
+  if (idx === -1) return;
+  const updated: Submission = {
+    ...list[idx]!,
+    marked,
+    markedAt: marked ? new Date().toISOString() : "",
+  };
+  list[idx] = updated;
+  localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(list));
+  saveSubmissionCloud(updated);
+}
 
 export function deleteSubmission(id: string): void {
   if (typeof window === "undefined") return;

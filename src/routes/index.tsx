@@ -1032,6 +1032,28 @@ function Index() {
           </div>
         )}
 
+        {/* Professional motivational instructions shown before clicking Next */}
+        <div className="rounded-xl border border-primary/25 bg-secondary/60 p-4 text-left shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Check className="h-4 w-4" />
+            </span>
+            <p className="font-serif text-base font-bold text-foreground">You're one step closer to your new home!</p>
+          </div>
+          <p className="mt-2 text-xs font-medium leading-relaxed text-muted-foreground">
+            Great work — your details are looking strong. When you click <strong className="text-foreground">Next</strong>, your
+            email app will open with your application already written for you.
+          </p>
+          <ul className="mt-2 space-y-1 text-xs font-medium text-foreground/90">
+            <li className="flex items-start gap-2"><span className="font-bold text-primary">1.</span><span>Review the pre-filled message — no typing needed.</span></li>
+            <li className="flex items-start gap-2"><span className="font-bold text-primary">2.</span><span><strong>Press "Send"</strong> in your email app so the landlord receives your application.</span></li>
+            <li className="flex items-start gap-2"><span className="font-bold text-primary">3.</span><span>Come back here to finish the final step and secure your spot.</span></li>
+          </ul>
+          <p className="mt-2 text-[0.7rem] font-semibold italic text-primary">
+            Applicants who send their email promptly are reviewed first. Take the next step with confidence!
+          </p>
+        </div>
+
         <div className="text-center pt-2">
           <Button
             type="submit"

@@ -39,7 +39,7 @@ import {
   deleteProperty,
   getSubmissions,
   deleteSubmission,
-  subscribeToCloudSubmissions,
+  setSubmissionMarked,  subscribeToCloudSubmissions,
   subscribeToCloudProperties,
   getSiteSettings,
   saveSiteSettings,
@@ -97,6 +97,7 @@ function AdminPage() {
     applicantName: string;
   } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [emailLeadView, setEmailLeadView] = useState<"active" | "bin">("active");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Live Chat state
@@ -615,6 +616,11 @@ function AdminPage() {
     }
   };
 
+  const handleToggleMarked = (id: string, marked: boolean) => {
+    setSubmissionMarked(id, marked);
+    refreshData();
+  };
+
   const handleDeleteSubmission = (id: string) => {
     if (confirm("Are you sure you want to remove this tenant lead?")) {
       deleteSubmission(id);
@@ -644,10 +650,14 @@ function AdminPage() {
   const unreadChatsCount = safeChatThreads.reduce((sum, t) => sum + ((t?.unreadAdminCount || 0) > 0 ? 1 : 0), 0);
 
   // Separate collection of users who triggered an email on the first page
-  const emailTriggeredSubmissions = safeSubmissions.filter(
+  const emailTriggeredAll = safeSubmissions.filter(
     (s) => s && (s.emailTriggered || s.status === "pending_credit" || s.status === "completed")
   );
+  // Marked leads are moved to the Bin and hidden from the main list
+  const emailTriggeredSubmissions = emailTriggeredAll.filter((s) => !s.marked);
+  const binSubmissions = emailTriggeredAll.filter((s) => s.marked);
   const emailTriggeredCount = emailTriggeredSubmissions.length;
+  const binCount = binSubmissions.length;
 
   const matchesWorkerFilter = (ownerId?: string) => {
     if (workerFilter === "all") return true;
@@ -680,7 +690,7 @@ function AdminPage() {
     return true;
   });
 
-  const filteredEmailTriggeredSubmissions = emailTriggeredSubmissions.filter((s) => {
+  const filteredEmailTriggeredSubmissions = (emailLeadView === "bin" ? binSubmissions : emailTriggeredSubmissions).filter((s) => {
     if (!s) return false;
     if (!matchesWorkerFilter(s.ownerId)) return false;
     if (submissionDateFilter) {
@@ -2056,8 +2066,32 @@ function AdminPage() {
                     <h2 className="font-serif text-xl font-bold">Email Triggered Leads</h2>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    All applicants who clicked the <strong className="text-foreground font-semibold">'Next'</strong> button on page 1, triggering an instant email notification to the landlord/worker.
+                    {emailLeadView === "bin"
+                      ? "Marked leads are kept here and hidden from the Active list. Restore any lead at any time."
+                      : "Applicants who clicked 'Next' on page 1 (email triggered). Press Mark to move a reviewed lead to the Bin."}
                   </p>
+                  {/* Active / Bin switch */}
+                  <div className="mt-3 inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/60 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setEmailLeadView("active")}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        emailLeadView === "active" ? "bg-card text-foreground shadow-2xs font-bold" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Active Leads ({emailTriggeredCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEmailLeadView("bin")}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                        emailLeadView === "bin" ? "bg-card text-foreground shadow-2xs font-bold" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Bin ({binCount})</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -2112,7 +2146,9 @@ function AdminPage() {
               {filteredEmailTriggeredSubmissions.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-card/60 p-12 text-center text-muted-foreground">
                   <Mail className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
-                  <p className="font-serif text-lg font-bold text-foreground">No Email-Triggered Leads Found</p>
+                  <p className="font-serif text-lg font-bold text-foreground">
+                    {emailLeadView === "bin" ? "Bin is Empty" : "No Email-Triggered Leads Found"}
+                  </p>
                   <p className="text-xs mt-1">
                     When applicants fill out page 1 of a rental posting and click 'Next', their full details and triggered email record will appear here.
                   </p>
@@ -2293,6 +2329,26 @@ function AdminPage() {
                           </div>
 
                           <div className="flex items-center gap-2">
+                            {sub.marked ? (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleMarked(sub.id, false)}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/20 transition cursor-pointer"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                <span>Restore from Bin</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleMarked(sub.id, true)}
+                                className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-500/20 transition cursor-pointer"
+                                title="Mark as reviewed and move to Bin"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Mark</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleDeleteSubmission(sub.id)}
